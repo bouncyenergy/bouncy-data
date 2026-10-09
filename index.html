@@ -1,0 +1,423 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marknadsdata – Bouncy Energy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-basic-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  /* Byt färger och typsnitt här så följer hela dashboarden med. */
+  :root {
+    --ink: #13242d;
+    --muted: #5d6e76;
+    --paper: #f6f8f7;
+    --card: #ffffff;
+    --line: #d8e0de;
+    --wind: #1b7f9e;
+    --solar: #e29a0e;
+    --accent: #13242d;
+    --warn-bg: #fff4d6;
+    --font-head: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 15px/1.5 var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 40px; }
+  h1 {
+    font: 700 clamp(24px, 4vw, 34px)/1.1 var(--font-head);
+    letter-spacing: -0.01em;
+    margin: 0 0 6px;
+  }
+  .lede { color: var(--muted); margin: 0 0 22px; max-width: 62ch; }
+  .banner {
+    background: var(--warn-bg);
+    border-left: 4px solid var(--solar);
+    padding: 10px 14px;
+    margin: 0 0 18px;
+    border-radius: 4px;
+  }
+  .banner[hidden] { display: none; }
+
+  /* Val av elområde */
+  .zones { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+  .zones button {
+    font: 500 14px var(--font-body);
+    color: var(--ink);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+  .zones button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  /* Nyckeltal */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 0 0 22px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .kpi dt { color: var(--muted); font-size: 13px; margin: 0 0 2px; }
+  .kpi dd { margin: 0; font: 700 28px/1.1 var(--font-head); }
+  .kpi.wind { border-top: 3px solid var(--wind); }
+  .kpi.solar { border-top: 3px solid var(--solar); }
+  .kpi.spread { border-top: 3px solid var(--ink); }
+  .kpi small { font: 400 13px var(--font-body); color: var(--muted); }
+
+  /* Flikar */
+  .tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+  .tabs button {
+    font: 600 15px var(--font-body);
+    background: none; border: 0; border-bottom: 3px solid transparent;
+    color: var(--muted); padding: 8px 0 9px; cursor: pointer; white-space: nowrap;
+  }
+  .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* Reglage */
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 24px; margin-bottom: 8px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--card); }
+  .seg button {
+    font: 500 14px var(--font-body); color: var(--ink);
+    background: none; border: 0; padding: 6px 12px; cursor: pointer;
+    border-right: 1px solid var(--line);
+  }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+  button:focus-visible { outline: 3px solid #7fc4dc; outline-offset: 2px; }
+
+  /* Diagram */
+  .panel[hidden] { display: none; }
+  .chart-block { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 6px; margin-bottom: 16px; }
+  .chart-block h2 { font: 700 17px/1.2 var(--font-head); margin: 0 0 2px; }
+  .chart-block p.sub { color: var(--muted); font-size: 13px; margin: 0 0 4px; }
+  .chart { width: 100%; height: 340px; }
+  .note { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
+  .note.alert { color: #8a5a00; }
+
+  details { margin-top: 8px; color: var(--muted); font-size: 14px; }
+  details summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+  details p { max-width: 75ch; }
+  footer { margin-top: 22px; color: var(--muted); font-size: 13px; }
+  footer a { color: inherit; }
+
+  @media (max-width: 560px) {
+    .chart { height: 300px; }
+    .kpi dd { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Vad får sol och vind betalt?</h1>
+  <p class="lede">Capture rates, prisspreadar och produktion för svenska elområden, med Finland, Danmark och Tyskland som jämförelse. Uppdateras varje natt från ENTSO-E.</p>
+
+  <div id="demo-banner" class="banner" hidden>Du tittar på demodata (syntetiska värden). Riktiga värden visas efter första körningen mot ENTSO-E.</div>
+  <div id="error" class="banner" hidden></div>
+
+  <div class="zones" id="zones" role="group" aria-label="Elområde"></div>
+
+  <dl class="kpis" id="kpis"></dl>
+
+  <div class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="capture" aria-selected="true">Capture rate</button>
+    <button role="tab" data-tab="spread" aria-selected="false">Spreadar</button>
+    <button role="tab" data-tab="recent" aria-selected="false">Pris och produktion</button>
+  </div>
+
+  <!-- Capture rate -->
+  <section class="panel" id="panel-capture">
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Beräkning" id="seg-view">
+        <button data-view="monthly" aria-pressed="true">Månadsvis</button>
+        <button data-view="rolling" aria-pressed="false">Rullande 12 mån</button>
+      </div>
+      <div class="seg" role="group" aria-label="Period" id="seg-range">
+        <button data-range="12" aria-pressed="true">12 mån</button>
+        <button data-range="24" aria-pressed="false">24 mån</button>
+        <button data-range="0" aria-pressed="false">Allt</button>
+      </div>
+    </div>
+    <div class="chart-block">
+      <h2>Capture rate</h2>
+      <p class="sub">Produktionsviktat pris i procent av genomsnittspriset. Under 100 % betyder att tekniken får lägre pris än snittet.</p>
+      <div class="chart" id="chart-rate"></div>
+      <p class="note" id="note-rate"></p>
+    </div>
+    <div class="chart-block">
+      <h2>Capture price och snittpris</h2>
+      <p class="sub">Euro per megawattimme.</p>
+      <div class="chart" id="chart-price"></div>
+    </div>
+  </section>
+
+  <!-- Spreadar -->
+  <section class="panel" id="panel-spread" hidden>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Spreadmått" id="seg-metric">
+        <button data-metric="day" aria-pressed="true">Dygn: högsta minus lägsta</button>
+        <button data-metric="mm" aria-pressed="false">Dygn: högsta minus medel</button>
+      </div>
+      <div class="seg" role="group" aria-label="Period" id="seg-range2">
+        <button data-range="12" aria-pressed="true">12 mån</button>
+        <button data-range="24" aria-pressed="false">24 mån</button>
+        <button data-range="0" aria-pressed="false">Allt</button>
+      </div>
+    </div>
+    <div class="chart-block">
+      <h2>Dygnsspread per månad</h2>
+      <p class="sub">Staplarna visar månadens medelspread, prickarna den största enskilda dygnsspreaden. Euro per megawattimme.</p>
+      <div class="chart" id="chart-spread"></div>
+    </div>
+    <div class="chart-block">
+      <h2>Timmar med negativt pris</h2>
+      <p class="sub">Antal timmar per månad.</p>
+      <div class="chart" id="chart-neg"></div>
+    </div>
+  </section>
+
+  <!-- Senaste dygnen -->
+  <section class="panel" id="panel-recent" hidden>
+    <div class="chart-block">
+      <h2>Day-ahead-pris, senaste två veckorna</h2>
+      <p class="sub">Euro per megawattimme, timvärden i svensk tid.</p>
+      <div class="chart" id="chart-hourly"></div>
+    </div>
+    <div class="chart-block">
+      <h2>Produktion av vind och sol</h2>
+      <p class="sub">Genomsnittlig effekt per timme i megawatt.</p>
+      <div class="chart" id="chart-prod"></div>
+      <p class="note" id="note-prod"></p>
+    </div>
+  </section>
+
+  <details>
+    <summary>Så beräknas måtten</summary>
+    <p><strong>Capture price</strong> är månadens produktionsviktade day-ahead-pris: summan av pris gånger produktion delat med summan av produktionen. <strong>Capture rate</strong> är capture price delat med månadens genomsnittspris (alla timmar lika viktade). <strong>Rullande 12 månader</strong> viktas med produktionen över hela fönstret, inte som ett snitt av tolv månadskvoter.</p>
+    <p><strong>Spreaden</strong> räknas per dygn (svensk tid) på timmedelvärden av priset. Dygnets spread är högsta minus lägsta timpris, alternativt högsta timpris minus dygnsmedel. Staplarna visar medelvärdet över månadens dygn.</p>
+    <p>Day-ahead har 15 minuters upplösning sedan oktober 2025. Allt slås här ihop till timmar så att äldre och nyare data blir jämförbara, vilket jämnar ut enskilda kvartstoppar. Pågående månad visas inte. Månader där produktionsdata saknas för mer än 20 % av timmarna lämnas tomma. Det gäller ofta solel i Sverige, där rapporteringen till ENTSO-E är ofullständig.</p>
+  </details>
+
+  <footer>Källa: <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a>. Senast uppdaterad: <span id="updated">–</span>. Bouncy Energy.</footer>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var MON = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+  var state = { zone: 'SE3', tab: 'capture', view: 'monthly', range: 12, metric: 'day' };
+  var DATA = null, RECENT = null;
+
+  var qs = new URLSearchParams(location.search);
+  if (qs.get('zone')) state.zone = qs.get('zone').toUpperCase();
+  if (['capture', 'spread', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
+
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function $(id) { return document.getElementById(id); }
+  function fmt(v, d) {
+    return v == null ? '–' : Number(v).toLocaleString('sv-SE', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+  }
+  function label(m) { return MON[parseInt(m.slice(5, 7), 10) - 1] + ' ' + m.slice(2, 4); }
+  function tail(arr, n) { return n ? arr.slice(-n) : arr.slice(); }
+  function pct(arr) { return arr.map(function (v) { return v == null ? null : v * 100; }); }
+  function lastValue(arr) {
+    for (var i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i];
+    return null;
+  }
+  function allNull(arr) { return arr.every(function (v) { return v == null; }); }
+
+  function layout(xs, extra) {
+    var step = Math.max(1, Math.ceil(xs.length / 12));
+    var base = {
+      margin: { l: 52, r: 14, t: 10, b: 44 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { family: css('--font-body'), size: 12, color: css('--ink') },
+      hovermode: 'x unified',
+      legend: { orientation: 'h', x: 0, y: 1.14 },
+      xaxis: {
+        type: 'category',
+        tickmode: 'array',
+        tickvals: xs.filter(function (_, i) { return i % step === 0; }),
+        gridcolor: 'rgba(0,0,0,0)',
+        linecolor: css('--line'),
+        fixedrange: true
+      },
+      yaxis: { gridcolor: css('--line'), zeroline: false, fixedrange: true }
+    };
+    return Object.assign(base, extra || {});
+  }
+  var CONFIG = { displayModeBar: false, responsive: true };
+
+  /* ---------- Övre delen ---------- */
+  function renderZones() {
+    var box = $('zones');
+    box.innerHTML = '';
+    DATA.order.forEach(function (key) {
+      var b = document.createElement('button');
+      b.textContent = key;
+      b.title = DATA.zones[key].name;
+      b.setAttribute('aria-pressed', String(key === state.zone));
+      b.addEventListener('click', function () { state.zone = key; renderAll(); });
+      box.appendChild(b);
+    });
+  }
+
+  function renderKpis(z) {
+    var wr = lastValue(z.wind.r_rate), sr = lastValue(z.solar.r_rate);
+    var sp = lastValue(z.spread.spread_mean);
+    var lastMonth = label(z.months[z.months.length - 1]);
+    $('kpis').innerHTML =
+      '<div class="kpi wind"><dt>Vind, rullande 12 mån</dt><dd>' + (wr == null ? '–' : fmt(wr * 100) + ' %') + '</dd></div>' +
+      '<div class="kpi solar"><dt>Sol, rullande 12 mån</dt><dd>' + (sr == null ? '–' : fmt(sr * 100) + ' %') + '</dd></div>' +
+      '<div class="kpi spread"><dt>Medelspread per dygn, ' + lastMonth + '</dt><dd>' + fmt(sp) + ' <small>€/MWh</small></dd></div>';
+  }
+
+  /* ---------- Flik: Capture rate ---------- */
+  function renderCapture(z) {
+    var rolling = state.view === 'rolling';
+    var xs = tail(z.months, state.range).map(label);
+    var windRate = pct(tail(rolling ? z.wind.r_rate : z.wind.rate, state.range));
+    var solarRate = pct(tail(rolling ? z.solar.r_rate : z.solar.rate, state.range));
+
+    var traces = [
+      { name: 'Vind', x: xs, y: windRate, mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' },
+      { name: 'Sol', x: xs, y: solarRate, mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' }
+    ];
+    Plotly.react('chart-rate', traces, layout(xs, {
+      yaxis: { gridcolor: css('--line'), zeroline: false, ticksuffix: ' %', rangemode: 'tozero', fixedrange: true },
+      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }]
+    }), CONFIG);
+
+    var notes = [];
+    if (allNull(z.solar.rate)) notes.push('Solproduktion saknas eller är för ofullständigt rapporterad i ENTSO-E för ' + z.name + '. Jämför med Danmark (DK1/DK2), Finland (FI) eller Tyskland (DE).');
+    if (allNull(z.wind.rate)) notes.push('Vindproduktion saknas för ' + z.name + '.');
+    if (rolling) notes.push('Rullande 12 månader kräver tolv månader med data i följd, så kurvan börjar först efter ett års historik.');
+    $('note-rate').textContent = notes.join(' ');
+    $('note-rate').className = 'note' + (notes.length && !rolling ? ' alert' : '');
+
+    var base = tail(rolling ? z.r_base : z.base, state.range);
+    var wp = tail(rolling ? z.wind.r_price : z.wind.price, state.range);
+    var sp = tail(rolling ? z.solar.r_price : z.solar.price, state.range);
+    Plotly.react('chart-price', [
+      { name: 'Snittpris', x: xs, y: base, mode: 'lines', line: { color: css('--ink'), width: 2, dash: 'dot' }, hovertemplate: '%{y:.1f}' },
+      { name: 'Vind', x: xs, y: wp, mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' },
+      { name: 'Sol', x: xs, y: sp, mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' }
+    ], layout(xs, { yaxis: { gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €', fixedrange: true } }), CONFIG);
+  }
+
+  /* ---------- Flik: Spreadar ---------- */
+  function renderSpread(z) {
+    var xs = tail(z.months, state.range).map(label);
+    var meanKey = state.metric === 'day' ? 'spread_mean' : 'mm_mean';
+    var maxKey = state.metric === 'day' ? 'spread_max' : 'mm_max';
+    Plotly.react('chart-spread', [
+      { type: 'bar', name: 'Medel per dygn', x: xs, y: tail(z.spread[meanKey], state.range), marker: { color: css('--ink') }, hovertemplate: '%{y:.0f} €/MWh' },
+      { type: 'scatter', mode: 'markers', name: 'Största dygnet', x: xs, y: tail(z.spread[maxKey], state.range), marker: { color: css('--solar'), size: 9, line: { color: css('--ink'), width: 1 } }, hovertemplate: '%{y:.0f} €/MWh' }
+    ], layout(xs, { yaxis: { gridcolor: css('--line'), zeroline: false, ticksuffix: ' €', rangemode: 'tozero', fixedrange: true }, bargap: 0.35 }), CONFIG);
+
+    Plotly.react('chart-neg', [
+      { type: 'bar', name: 'Timmar', x: xs, y: tail(z.neg_hours, state.range), marker: { color: css('--wind') }, hovertemplate: '%{y} timmar' }
+    ], layout(xs, { showlegend: false, margin: { l: 52, r: 14, t: 10, b: 44 }, yaxis: { gridcolor: css('--line'), zeroline: false, rangemode: 'tozero', fixedrange: true }, bargap: 0.35 }), CONFIG);
+  }
+
+  /* ---------- Flik: Pris och produktion ---------- */
+  function renderRecent() {
+    var r = RECENT.zones[state.zone];
+    if (!r) return;
+    var xs = r.t;
+    var xaxis = { type: 'date', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true, tickformat: '%-d %b' };
+    Plotly.react('chart-hourly', [
+      { type: 'scatter', mode: 'lines', name: 'Pris', x: xs, y: r.price, line: { color: css('--ink'), width: 1.8, shape: 'hv' }, hovertemplate: '%{y:.1f} €/MWh' }
+    ], layout(xs, { showlegend: false, xaxis: xaxis, yaxis: { gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--muted'), ticksuffix: ' €', fixedrange: true } }), CONFIG);
+
+    var traces = [
+      { type: 'scatter', mode: 'lines', name: 'Vind', x: xs, y: r.wind, stackgroup: 'p', line: { color: css('--wind'), width: 0.8 }, fillcolor: 'rgba(27,127,158,0.55)', hovertemplate: '%{y:.0f} MW' },
+      { type: 'scatter', mode: 'lines', name: 'Sol', x: xs, y: r.solar, stackgroup: 'p', line: { color: css('--solar'), width: 0.8 }, fillcolor: 'rgba(226,154,14,0.6)', hovertemplate: '%{y:.0f} MW' }
+    ];
+    Plotly.react('chart-prod', traces, layout(xs, { xaxis: xaxis, yaxis: { gridcolor: css('--line'), zeroline: false, ticksuffix: ' MW', fixedrange: true } }), CONFIG);
+    var missing = [];
+    if (allNull(r.solar)) missing.push('sol');
+    if (allNull(r.wind)) missing.push('vind');
+    $('note-prod').textContent = missing.length ? 'Ingen rapporterad produktion av ' + missing.join(' och ') + ' de senaste dagarna för detta område.' : '';
+  }
+
+  /* ---------- Samordning ---------- */
+  function setPressed(containerId, attr, value) {
+    Array.prototype.forEach.call($(containerId).querySelectorAll('button'), function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute(attr) === String(value)));
+    });
+  }
+
+  function renderAll() {
+    var z = DATA.zones[state.zone];
+    if (!z) { state.zone = DATA.order[0]; z = DATA.zones[state.zone]; }
+    renderZones();
+    renderKpis(z);
+
+    Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
+      b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
+    });
+    ['capture', 'spread', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
+
+    setPressed('seg-view', 'data-view', state.view);
+    setPressed('seg-range', 'data-range', state.range);
+    setPressed('seg-range2', 'data-range', state.range);
+    setPressed('seg-metric', 'data-metric', state.metric);
+
+    if (state.tab === 'capture') renderCapture(z);
+    if (state.tab === 'spread') renderSpread(z);
+    if (state.tab === 'recent') renderRecent();
+  }
+
+  function bind() {
+    $('tabs').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.tab = b.dataset.tab; renderAll();
+    });
+    $('seg-view').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.view = b.dataset.view; renderAll();
+    });
+    ['seg-range', 'seg-range2'].forEach(function (id) {
+      $(id).addEventListener('click', function (e) {
+        var b = e.target.closest('button'); if (!b) return;
+        state.range = parseInt(b.dataset.range, 10); renderAll();
+      });
+    });
+    $('seg-metric').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.metric = b.dataset.metric; renderAll();
+    });
+  }
+
+  function showError(msg) {
+    var el = $('error');
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  Promise.all([
+    fetch('data/summary.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('summary'); return r.json(); }),
+    fetch('data/recent.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('recent'); return r.json(); })
+  ]).then(function (res) {
+    DATA = res[0]; RECENT = res[1];
+    $('demo-banner').hidden = !DATA.demo;
+    $('updated').textContent = new Date(DATA.generated).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short' });
+    bind();
+    renderAll();
+  }).catch(function () {
+    showError('Kunde inte läsa datafilerna. Kontrollera att mappen data/ ligger bredvid index.html, och öppna sidan via en webbserver (inte direkt från filsystemet).');
+  });
+})();
+</script>
+</body>
+</html>
