@@ -6,7 +6,7 @@
 <title>Marknadsdata – Bouncy Energy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.plot.ly/plotly-basic-2.35.2.min.js" charset="utf-8"></script>
 <style>
   /* Byt färger och typsnitt här så följer hela dashboarden med. */
@@ -20,8 +20,8 @@
     --solar: #e29a0e;
     --accent: #13242d;
     --warn-bg: #fff4d6;
-    --font-head: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
-    --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --font-head: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+    --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -92,6 +92,13 @@
 
   button:focus-visible { outline: 3px solid #7fc4dc; outline-offset: 2px; }
 
+  .sel { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+  .sel select {
+    font: 500 14px var(--font-body); color: var(--ink); background: var(--card);
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; max-width: 100%;
+  }
+  .axis-note { color: var(--muted); font-size: 13px; margin: -8px 0 18px; }
+
   /* Diagram */
   .panel[hidden] { display: none; }
   .chart-block { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 6px; margin-bottom: 16px; }
@@ -106,6 +113,21 @@
   details p { max-width: 75ch; }
   footer { margin-top: 22px; color: var(--muted); font-size: 13px; }
   footer a { color: inherit; }
+
+
+  /* Definitioner och noter */
+  .defs { margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--ink); }
+  .defs h2 { font: 700 20px/1.2 var(--font-head); margin: 0 0 12px; }
+  .defs dl { display: grid; grid-template-columns: minmax(130px, 200px) 1fr; gap: 8px 18px; margin: 0 0 18px; font-size: 14px; }
+  .defs dt { font-weight: 600; }
+  .defs dd { margin: 0; color: var(--muted); max-width: 70ch; }
+  .defs ol.notes { padding-left: 20px; margin: 0 0 12px; font-size: 13px; color: var(--muted); max-width: 80ch; }
+  .defs ol.notes li { margin-bottom: 8px; }
+  .defs ol.notes li:target { background: var(--warn-bg); }
+  .defs .disclaimer { font-size: 12.5px; color: var(--muted); max-width: 80ch; }
+  sup a { color: var(--muted); text-decoration: none; font-weight: 600; }
+  sup a:hover { text-decoration: underline; }
+  @media (max-width: 560px) { .defs dl { grid-template-columns: 1fr; gap: 0; } .defs dt { margin-top: 10px; } }
 
   @media (max-width: 560px) {
     .chart { height: 300px; }
@@ -123,12 +145,14 @@
   <div id="error" class="banner" hidden></div>
 
   <div class="zones" id="zones" role="group" aria-label="Elområde"></div>
+  <p class="axis-note">Y-axlarna är gemensamma för alla elområden (utom produktion i MW), så du kan byta område och jämföra direkt.</p>
 
   <dl class="kpis" id="kpis"></dl>
 
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="capture" aria-selected="true">Capture rate</button>
     <button role="tab" data-tab="spread" aria-selected="false">Spreadar</button>
+    <button role="tab" data-tab="season" aria-selected="false">Säsong</button>
     <button role="tab" data-tab="recent" aria-selected="false">Pris och produktion</button>
   </div>
 
@@ -147,7 +171,7 @@
     </div>
     <div class="chart-block">
       <h2>Capture rate</h2>
-      <p class="sub">Produktionsviktat pris i procent av genomsnittspriset. Under 100 % betyder att tekniken får lägre pris än snittet.</p>
+      <p class="sub">Produktionsviktat pris i procent av genomsnittspriset. Under 100 % betyder att tekniken får lägre pris än snittet.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
       <div class="chart" id="chart-rate"></div>
       <p class="note" id="note-rate"></p>
     </div>
@@ -173,13 +197,36 @@
     </div>
     <div class="chart-block">
       <h2>Dygnsspread per månad</h2>
-      <p class="sub">Staplarna visar månadens medelspread, prickarna den största enskilda dygnsspreaden. Euro per megawattimme.</p>
+      <p class="sub">Staplarna visar månadens medelspread, prickarna den största enskilda dygnsspreaden. Euro per megawattimme.<sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
       <div class="chart" id="chart-spread"></div>
     </div>
     <div class="chart-block">
       <h2>Timmar med negativt pris</h2>
-      <p class="sub">Antal timmar per månad.</p>
+      <p class="sub">Antal timmar per månad.<sup><a href="#n5">5</a></sup></p>
       <div class="chart" id="chart-neg"></div>
+    </div>
+  </section>
+
+  <!-- Säsong -->
+  <section class="panel" id="panel-season" hidden>
+    <div class="controls">
+      <label class="sel">Mått
+        <select id="sel-season">
+          <option value="wind_rate">Capture rate, vind</option>
+          <option value="solar_rate">Capture rate, sol</option>
+          <option value="wind_price">Capture price, vind</option>
+          <option value="solar_price">Capture price, sol</option>
+          <option value="spread_mean">Medelspread, högsta minus lägsta</option>
+          <option value="mm_mean">Medelspread, högsta minus medel</option>
+          <option value="base">Snittpris</option>
+        </select>
+      </label>
+    </div>
+    <div class="chart-block">
+      <h2 id="season-title">Säsongsvariation</h2>
+      <p class="sub" id="season-sub"></p>
+      <div class="chart" id="chart-season"></div>
+      <p class="note" id="note-season"></p>
     </div>
   </section>
 
@@ -187,23 +234,57 @@
   <section class="panel" id="panel-recent" hidden>
     <div class="chart-block">
       <h2>Day-ahead-pris, senaste två veckorna</h2>
-      <p class="sub">Euro per megawattimme, timvärden i svensk tid.</p>
+      <p class="sub">Euro per megawattimme, timvärden i svensk tid.<sup><a href="#n5">5</a></sup></p>
       <div class="chart" id="chart-hourly"></div>
     </div>
     <div class="chart-block">
       <h2>Produktion av vind och sol</h2>
-      <p class="sub">Genomsnittlig effekt per timme i megawatt.</p>
+      <p class="sub">Genomsnittlig effekt per timme i megawatt.<sup><a href="#n4">4</a></sup></p>
       <div class="chart" id="chart-prod"></div>
       <p class="note" id="note-prod"></p>
     </div>
   </section>
 
-  <details>
-    <summary>Så beräknas måtten</summary>
-    <p><strong>Capture price</strong> är månadens produktionsviktade day-ahead-pris: summan av pris gånger produktion delat med summan av produktionen. <strong>Capture rate</strong> är capture price delat med månadens genomsnittspris (alla timmar lika viktade). <strong>Rullande 12 månader</strong> viktas med produktionen över hela fönstret, inte som ett snitt av tolv månadskvoter.</p>
-    <p><strong>Spreaden</strong> räknas per dygn (svensk tid) på timmedelvärden av priset. Dygnets spread är högsta minus lägsta timpris, alternativt högsta timpris minus dygnsmedel. Staplarna visar medelvärdet över månadens dygn.</p>
-    <p>Day-ahead har 15 minuters upplösning sedan oktober 2025. Allt slås här ihop till timmar så att äldre och nyare data blir jämförbara, vilket jämnar ut enskilda kvartstoppar. Pågående månad visas inte. Månader där produktionsdata saknas för mer än 20 % av timmarna lämnas tomma. Det gäller ofta solel i Sverige, där rapporteringen till ENTSO-E är ofullständig.</p>
-  </details>
+  <section class="defs" id="definitioner">
+    <h2>Definitioner och noter</h2>
+
+    <dl>
+      <dt>Day-ahead-pris</dt>
+      <dd>Elbörsens pris för nästa dygn, fastställt dagen innan, per elområde och i euro per megawattimme (EUR/MWh). Det är inte slutkundspriset, och det innehåller varken skatter, nätavgifter eller elhandlarens påslag. Intradagspriser och balanspriser ingår inte.</dd>
+
+      <dt>Elområde</dt>
+      <dd>Sverige är uppdelat i fyra (SE1–SE4). Finland, Danmark (DK1 och DK2) och Tyskland (här DE-LU, tillsammans med Luxemburg) visas som jämförelse.</dd>
+
+      <dt>Snittpris</dt>
+      <dd>Genomsnittligt day-ahead-pris under perioden, där alla timmar väger lika.</dd>
+
+      <dt>Capture price</dt>
+      <dd>Det genomsnittspris en teknik fått när den producerat, det vill säga priset viktat med produktionen timme för timme.</dd>
+
+      <dt>Capture rate</dt>
+      <dd>Capture price delat med snittpriset, i procent. 100 % betyder att tekniken fått ett pris lika med snittet, och lägre värden betyder att produktionen ligger i timmar med lägre pris än genomsnittet.</dd>
+
+      <dt>Rullande 12 månader</dt>
+      <dd>Samma beräkning över de senaste tolv månaderna i ett svep, viktat med produktionen. Det är inte ett medelvärde av tolv månadskvoter.</dd>
+
+      <dt>Dygnsspread</dt>
+      <dd>Skillnaden mellan dygnets högsta och lägsta timpris, i EUR/MWh. Alternativt visas högsta timpris minus dygnets medelpris. Staplarna visar medelvärdet över månadens dygn och prickarna det dygn som hade störst spread.</dd>
+
+      <dt>Timmar med negativt pris</dt>
+      <dd>Antal timmar i månaden då timmedelpriset var under noll.</dd>
+    </dl>
+
+    <ol class="notes">
+      <li id="n1"><strong>Capture rate.</strong> Beräknas som summan av pris gånger produktion dividerat med summan av produktionen, och därefter delat med snittpriset. Vind är land- plus havsbaserad vind. Produktionen är ENTSO-E:s faktiska aggregerade produktion per produktionstyp.</li>
+      <li id="n2"><strong>Spreaden är timvis.</strong> Den räknas på timmedelvärden av priset, per dygn i svensk tid, och inte på kvartspriser. Korta pristoppar och dalar jämnas därför ut, och siffrorna blir lägre än om man räknar på 15-minutersnivå. Dygn med färre än 22 timmars data räknas inte med.</li>
+      <li id="n3"><strong>Spread är inte en intäkt.</strong> Måttet visar den teoretiska skillnaden mellan dygnets högsta och lägsta pris. Den som vill tjäna på spreaden, till exempel med ett batteri, påverkas av verkningsgrad, antal cykler per dygn, effekt- och energibegränsning, nätavgifter och skillnader mellan day-ahead, intradag och reservmarknader. Utfallet blir därför lägre.</li>
+      <li id="n4"><strong>Sol och vind: täckning.</strong> Kvaliteten på rapporteringen till ENTSO-E skiljer sig mellan länder och över tid. Särskilt solproduktion i Sverige är ofullständig, eftersom mycket solel är småskalig eller sitter bakom mätaren och inte rapporteras fullt ut. Siffrorna visar den rapporterade produktionen och inte nödvändigtvis hela den faktiska produktionen. Månader där produktionsdata saknas för mer än 20 % av timmarna visas som tomma.</li>
+      <li id="n5"><strong>Upplösning.</strong> Day-ahead har haft 15 minuters upplösning sedan oktober 2025 (tidigare timpriser). Allt slås här ihop till timmedelvärden för att äldre och nyare data ska vara jämförbara. En negativ kvart inom en timme syns därför inte om timmedlet är över noll.</li>
+      <li id="n6"><strong>Vilka månader som visas.</strong> Den pågående månaden visas inte, och inte heller månader där mer än 10 % av prisdata saknas. Produktionsdata revideras i efterhand av nätbolagen, så tidigare månader kan ändras något vid nästa uppdatering.</li>
+    </ol>
+
+    <p class="disclaimer">Informationen är endast avsedd som underlag och utgör inte investerings- eller rådgivning. Data kan innehålla fel eller luckor. Valuta: euro.</p>
+  </section>
 
   <footer>Källa: <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a>. Senast uppdaterad: <span id="updated">–</span>. Bouncy Energy.</footer>
 </div>
@@ -213,12 +294,12 @@
   'use strict';
 
   var MON = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-  var state = { zone: 'SE3', tab: 'capture', view: 'monthly', range: 12, metric: 'day' };
+  var state = { zone: 'SE3', tab: 'capture', view: 'monthly', range: 12, metric: 'day', season: 'wind_rate' };
   var DATA = null, RECENT = null;
 
   var qs = new URLSearchParams(location.search);
   if (qs.get('zone')) state.zone = qs.get('zone').toUpperCase();
-  if (['capture', 'spread', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
+  if (['capture', 'spread', 'season', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
 
   function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   function $(id) { return document.getElementById(id); }
@@ -281,19 +362,52 @@
       '<div class="kpi spread"><dt>Medelspread per dygn, ' + lastMonth + '</dt><dd>' + fmt(sp) + ' <small>€/MWh</small></dd></div>';
   }
 
+  /* ---------- Gemensam y-axel för alla områden ---------- */
+  function globalExtent(getter) {
+    var lo = Infinity, hi = -Infinity;
+    DATA.order.forEach(function (k) {
+      getter(DATA.zones[k]).forEach(function (v) {
+        if (v == null) return;
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      });
+    });
+    return lo === Infinity ? null : [lo, hi];
+  }
+  function niceRange(ext, forceZero, minHi) {
+    if (!ext) return null;
+    var lo = forceZero ? Math.min(0, ext[0]) : ext[0];
+    var hi = Math.max(ext[1], minHi == null ? -Infinity : minHi);
+    var span = Math.max(hi - lo, 1);
+    var step = span > 400 ? 100 : span > 200 ? 50 : span > 80 ? 20 : span > 40 ? 10 : 5;
+    lo = Math.floor(lo / step) * step;
+    hi = Math.ceil((hi + 0.03 * span) / step) * step;
+    if (hi <= lo) hi = lo + step;
+    return [lo, hi];
+  }
+  function yAxis(extra, range) {
+    var ax = { gridcolor: css('--line'), zeroline: false, fixedrange: true };
+    Object.assign(ax, extra || {});
+    if (range) { ax.range = range; ax.autorange = false; }
+    return ax;
+  }
+
   /* ---------- Flik: Capture rate ---------- */
   function renderCapture(z) {
     var rolling = state.view === 'rolling';
     var xs = tail(z.months, state.range).map(label);
-    var windRate = pct(tail(rolling ? z.wind.r_rate : z.wind.rate, state.range));
-    var solarRate = pct(tail(rolling ? z.solar.r_rate : z.solar.rate, state.range));
+    function rateOf(zz, tech) { return pct(tail(rolling ? zz[tech].r_rate : zz[tech].rate, state.range)); }
+    function priceOf(zz, tech) { return tail(rolling ? zz[tech].r_price : zz[tech].price, state.range); }
+    function baseOf(zz) { return tail(rolling ? zz.r_base : zz.base, state.range); }
 
-    var traces = [
-      { name: 'Vind', x: xs, y: windRate, mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' },
-      { name: 'Sol', x: xs, y: solarRate, mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' }
-    ];
-    Plotly.react('chart-rate', traces, layout(xs, {
-      yaxis: { gridcolor: css('--line'), zeroline: false, ticksuffix: ' %', rangemode: 'tozero', fixedrange: true },
+    var rateRange = niceRange(globalExtent(function (zz) { return rateOf(zz, 'wind').concat(rateOf(zz, 'solar')); }), true, 110);
+    var priceRange = niceRange(globalExtent(function (zz) { return baseOf(zz).concat(priceOf(zz, 'wind'), priceOf(zz, 'solar')); }), true);
+
+    Plotly.react('chart-rate', [
+      { name: 'Vind', x: xs, y: rateOf(z, 'wind'), mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' },
+      { name: 'Sol', x: xs, y: rateOf(z, 'solar'), mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' }
+    ], layout(xs, {
+      yaxis: yAxis({ ticksuffix: ' %' }, rateRange),
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }]
     }), CONFIG);
 
@@ -304,14 +418,11 @@
     $('note-rate').textContent = notes.join(' ');
     $('note-rate').className = 'note' + (notes.length && !rolling ? ' alert' : '');
 
-    var base = tail(rolling ? z.r_base : z.base, state.range);
-    var wp = tail(rolling ? z.wind.r_price : z.wind.price, state.range);
-    var sp = tail(rolling ? z.solar.r_price : z.solar.price, state.range);
     Plotly.react('chart-price', [
-      { name: 'Snittpris', x: xs, y: base, mode: 'lines', line: { color: css('--ink'), width: 2, dash: 'dot' }, hovertemplate: '%{y:.1f}' },
-      { name: 'Vind', x: xs, y: wp, mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' },
-      { name: 'Sol', x: xs, y: sp, mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' }
-    ], layout(xs, { yaxis: { gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €', fixedrange: true } }), CONFIG);
+      { name: 'Snittpris', x: xs, y: baseOf(z), mode: 'lines', line: { color: css('--ink'), width: 2, dash: 'dot' }, hovertemplate: '%{y:.1f}' },
+      { name: 'Vind', x: xs, y: priceOf(z, 'wind'), mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' },
+      { name: 'Sol', x: xs, y: priceOf(z, 'solar'), mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' }
+    ], layout(xs, { yaxis: yAxis({ zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €' }, priceRange) }), CONFIG);
   }
 
   /* ---------- Flik: Spreadar ---------- */
@@ -319,14 +430,82 @@
     var xs = tail(z.months, state.range).map(label);
     var meanKey = state.metric === 'day' ? 'spread_mean' : 'mm_mean';
     var maxKey = state.metric === 'day' ? 'spread_max' : 'mm_max';
+    var spreadRange = niceRange(globalExtent(function (zz) {
+      return tail(zz.spread[meanKey], state.range).concat(tail(zz.spread[maxKey], state.range));
+    }), true);
+    var negRange = niceRange(globalExtent(function (zz) { return tail(zz.neg_hours, state.range); }), true);
+
     Plotly.react('chart-spread', [
       { type: 'bar', name: 'Medel per dygn', x: xs, y: tail(z.spread[meanKey], state.range), marker: { color: css('--ink') }, hovertemplate: '%{y:.0f} €/MWh' },
       { type: 'scatter', mode: 'markers', name: 'Största dygnet', x: xs, y: tail(z.spread[maxKey], state.range), marker: { color: css('--solar'), size: 9, line: { color: css('--ink'), width: 1 } }, hovertemplate: '%{y:.0f} €/MWh' }
-    ], layout(xs, { yaxis: { gridcolor: css('--line'), zeroline: false, ticksuffix: ' €', rangemode: 'tozero', fixedrange: true }, bargap: 0.35 }), CONFIG);
+    ], layout(xs, { yaxis: yAxis({ ticksuffix: ' €' }, spreadRange), bargap: 0.35 }), CONFIG);
 
     Plotly.react('chart-neg', [
       { type: 'bar', name: 'Timmar', x: xs, y: tail(z.neg_hours, state.range), marker: { color: css('--wind') }, hovertemplate: '%{y} timmar' }
-    ], layout(xs, { showlegend: false, margin: { l: 52, r: 14, t: 10, b: 44 }, yaxis: { gridcolor: css('--line'), zeroline: false, rangemode: 'tozero', fixedrange: true }, bargap: 0.35 }), CONFIG);
+    ], layout(xs, { showlegend: false, yaxis: yAxis({}, negRange), bargap: 0.35 }), CONFIG);
+  }
+
+  /* ---------- Flik: Säsong ---------- */
+  var SEASON = {
+    wind_rate:   { label: 'capture rate, vind', scale: 100, suffix: ' %', ref100: true,
+                   desc: 'Procent av månadens snittpris. 100 % betyder att vinden fått snittpriset.',
+                   get: function (z) { return z.wind.rate; } },
+    solar_rate:  { label: 'capture rate, sol', scale: 100, suffix: ' %', ref100: true,
+                   desc: 'Procent av månadens snittpris. 100 % betyder att solen fått snittpriset.',
+                   get: function (z) { return z.solar.rate; } },
+    wind_price:  { label: 'capture price, vind', scale: 1, suffix: ' €',
+                   desc: 'Produktionsviktat pris i euro per megawattimme.',
+                   get: function (z) { return z.wind.price; } },
+    solar_price: { label: 'capture price, sol', scale: 1, suffix: ' €',
+                   desc: 'Produktionsviktat pris i euro per megawattimme.',
+                   get: function (z) { return z.solar.price; } },
+    spread_mean: { label: 'medelspread, högsta minus lägsta', scale: 1, suffix: ' €',
+                   desc: 'Medelvärde över månadens dygn, euro per megawattimme, räknat på timpriser.',
+                   get: function (z) { return z.spread.spread_mean; } },
+    mm_mean:     { label: 'medelspread, högsta minus medel', scale: 1, suffix: ' €',
+                   desc: 'Dygnets högsta timpris minus dygnsmedel, medel över månaden, euro per megawattimme.',
+                   get: function (z) { return z.spread.mm_mean; } },
+    base:        { label: 'snittpris', scale: 1, suffix: ' €',
+                   desc: 'Genomsnittligt day-ahead-pris, alla timmar lika viktade, euro per megawattimme.',
+                   get: function (z) { return z.base; } }
+  };
+  var YEAR_COLORS = ['#cbd5d9', '#a5b8c0', '#7b98a6', '#4b7186', '#13242d'];
+
+  function renderSeason(z) {
+    var def = SEASON[state.season];
+    var scaled = function (zz) { return def.get(zz).map(function (v) { return v == null ? null : v * def.scale; }); };
+    var range = niceRange(globalExtent(scaled), true, def.ref100 ? 110 : null);
+
+    var byYear = {};
+    var vals = scaled(z);
+    z.months.forEach(function (m, i) {
+      var y = m.slice(0, 4), mi = parseInt(m.slice(5, 7), 10) - 1;
+      if (!byYear[y]) byYear[y] = [null, null, null, null, null, null, null, null, null, null, null, null];
+      byYear[y][mi] = vals[i];
+    });
+    var years = Object.keys(byYear).sort();
+    var xs = MON.map(function (m) { return m.charAt(0).toUpperCase() + m.slice(1); });
+
+    var traces = years.map(function (y, idx) {
+      var fromEnd = years.length - 1 - idx;
+      var latest = fromEnd === 0;
+      var color = YEAR_COLORS[Math.max(0, YEAR_COLORS.length - 1 - fromEnd)];
+      return {
+        name: y, x: xs, y: byYear[y], mode: 'lines+markers', connectgaps: false,
+        line: { color: color, width: latest ? 3.5 : 2.2 }, marker: { size: latest ? 7 : 5 },
+        hovertemplate: '%{y:.' + (def.scale === 100 ? 0 : 0) + 'f}' + def.suffix
+      };
+    });
+
+    var opts = { yaxis: yAxis({ ticksuffix: def.suffix }, range) };
+    if (def.ref100) opts.shapes = [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }];
+    Plotly.react('chart-season', traces, layout(xs, opts), CONFIG);
+
+    $('season-title').textContent = 'Säsong: ' + def.label + ', ' + z.name;
+    $('season-sub').textContent = 'Månadsvärden januari–december, en linje per år. ' + def.desc;
+    var note = 'Det senaste året visar bara fullständiga månader.';
+    if (allNull(vals)) note = 'Data saknas för detta mått och område. ' + note;
+    $('note-season').textContent = note;
   }
 
   /* ---------- Flik: Pris och produktion ---------- */
@@ -334,20 +513,27 @@
     var r = RECENT.zones[state.zone];
     if (!r) return;
     var xs = r.t;
+    var lo = Infinity, hi = -Infinity;
+    Object.keys(RECENT.zones).forEach(function (k) {
+      RECENT.zones[k].price.forEach(function (v) { if (v == null) return; if (v < lo) lo = v; if (v > hi) hi = v; });
+    });
+    var priceRange = lo === Infinity ? null : niceRange([lo, hi], true);
     var xaxis = { type: 'date', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true, tickformat: '%-d %b' };
+
     Plotly.react('chart-hourly', [
       { type: 'scatter', mode: 'lines', name: 'Pris', x: xs, y: r.price, line: { color: css('--ink'), width: 1.8, shape: 'hv' }, hovertemplate: '%{y:.1f} €/MWh' }
-    ], layout(xs, { showlegend: false, xaxis: xaxis, yaxis: { gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--muted'), ticksuffix: ' €', fixedrange: true } }), CONFIG);
+    ], layout(xs, { showlegend: false, xaxis: xaxis, yaxis: yAxis({ zeroline: true, zerolinecolor: css('--muted'), ticksuffix: ' €' }, priceRange) }), CONFIG);
 
-    var traces = [
+    Plotly.react('chart-prod', [
       { type: 'scatter', mode: 'lines', name: 'Vind', x: xs, y: r.wind, stackgroup: 'p', line: { color: css('--wind'), width: 0.8 }, fillcolor: 'rgba(27,127,158,0.55)', hovertemplate: '%{y:.0f} MW' },
       { type: 'scatter', mode: 'lines', name: 'Sol', x: xs, y: r.solar, stackgroup: 'p', line: { color: css('--solar'), width: 0.8 }, fillcolor: 'rgba(226,154,14,0.6)', hovertemplate: '%{y:.0f} MW' }
-    ];
-    Plotly.react('chart-prod', traces, layout(xs, { xaxis: xaxis, yaxis: { gridcolor: css('--line'), zeroline: false, ticksuffix: ' MW', fixedrange: true } }), CONFIG);
+    ], layout(xs, { xaxis: xaxis, yaxis: yAxis({ ticksuffix: ' MW' }) }), CONFIG);
     var missing = [];
     if (allNull(r.solar)) missing.push('sol');
     if (allNull(r.wind)) missing.push('vind');
-    $('note-prod').textContent = missing.length ? 'Ingen rapporterad produktion av ' + missing.join(' och ') + ' de senaste dagarna för detta område.' : '';
+    var msg = 'Produktionsaxeln anpassas till varje område eftersom volymerna skiljer sig kraftigt.';
+    if (missing.length) msg = 'Ingen rapporterad produktion av ' + missing.join(' och ') + ' de senaste dagarna för detta område. ' + msg;
+    $('note-prod').textContent = msg;
   }
 
   /* ---------- Samordning ---------- */
@@ -366,7 +552,8 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
     });
-    ['capture', 'spread', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
+    ['capture', 'spread', 'season', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
+    $('sel-season').value = state.season;
 
     setPressed('seg-view', 'data-view', state.view);
     setPressed('seg-range', 'data-range', state.range);
@@ -375,6 +562,7 @@
 
     if (state.tab === 'capture') renderCapture(z);
     if (state.tab === 'spread') renderSpread(z);
+    if (state.tab === 'season') renderSeason(z);
     if (state.tab === 'recent') renderRecent();
   }
 
@@ -392,6 +580,9 @@
         var b = e.target.closest('button'); if (!b) return;
         state.range = parseInt(b.dataset.range, 10); renderAll();
       });
+    });
+    $('sel-season').addEventListener('change', function (e) {
+      state.season = e.target.value; renderAll();
     });
     $('seg-metric').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
