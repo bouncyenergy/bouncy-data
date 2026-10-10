@@ -123,6 +123,14 @@
   .quick { display: flex; gap: 2px; }
   .quick button { font: 500 12.5px var(--font-body); background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 4px 6px; }
 
+  .data-table-wrap { overflow-x: auto; }
+  .data-table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 13px; }
+  .data-table th, .data-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+  .data-table th:nth-child(-n+2), .data-table td:nth-child(-n+2) { text-align: left; }
+  .data-table thead th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .data-table tr.first td { border-top: 2px solid var(--line); }
+  .data-table td.pos { color: #11704a; font-weight: 600; }
+
   /* Diagram */
   .panel[hidden] { display: none; }
   .chart-block { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 6px; margin-bottom: 16px; }
@@ -175,15 +183,28 @@
 
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="capture" aria-selected="true">Capture rate</button>
-    <button role="tab" data-tab="spread" aria-selected="false">Spreadar</button>
     <button role="tab" data-tab="duck" aria-selected="false">Duck curve</button>
-    <button role="tab" data-tab="season" aria-selected="false">Säsong</button>
+    <button role="tab" data-tab="solar" aria-selected="false">Solpark + BESS</button>
     <button role="tab" data-tab="recent" aria-selected="false">Pris och produktion</button>
   </div>
+
+  <div class="zonebar" id="zonebar" role="group" aria-label="Välj elområden">
+      <span class="zonebar-label">Elområden</span>
+      <div class="chips" id="zone-chips"></div>
+      <div class="quick" id="zonebar-quick">
+        <button data-quick="all">Alla</button>
+        <button data-quick="se">SE1–4</button>
+        <button data-quick="none">Inga</button>
+      </div>
+    </div>
 
   <!-- Capture rate -->
   <section class="panel" id="panel-capture">
     <div class="controls">
+      <div class="seg" role="group" aria-label="Teknik" id="seg-tech">
+        <button data-tech="wind" aria-pressed="true">Vind</button>
+        <button data-tech="solar" aria-pressed="false">Sol</button>
+      </div>
       <div class="seg" role="group" aria-label="Beräkning" id="seg-view">
         <button data-view="monthly" aria-pressed="true">Månadsvis</button>
         <button data-view="rolling" aria-pressed="false">Rullande 12 mån</button>
@@ -194,55 +215,28 @@
         <button data-range="0" aria-pressed="false">Allt</button>
       </div>
     </div>
+    <p class="note alert" id="note-nozones-c"></p>
     <div class="chart-block">
-      <h2>Capture rate</h2>
+      <h2 id="rate-title">Capture rate</h2>
       <p class="sub">Produktionsviktat pris i procent av genomsnittspriset. Under 100 % betyder att tekniken får lägre pris än snittet.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
       <div class="chart" id="chart-rate"></div>
       <p class="note" id="note-rate"></p>
     </div>
     <div class="chart-block">
-      <h2>Capture price och snittpris</h2>
+      <h2 id="price-title">Capture price</h2>
       <p class="sub">Euro per megawattimme.</p>
+      <div class="controls inner">
+        <div class="seg" role="group" aria-label="Snittpris" id="seg-base">
+          <button data-base="off" aria-pressed="true">Bara capture price</button>
+          <button data-base="on" aria-pressed="false">Visa även snittpris (prickad)</button>
+        </div>
+      </div>
       <div class="chart" id="chart-price"></div>
-    </div>
-  </section>
-
-  <!-- Spreadar -->
-  <section class="panel" id="panel-spread" hidden>
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Spreadmått" id="seg-metric">
-        <button data-metric="day" aria-pressed="true">Dygn: högsta minus lägsta</button>
-        <button data-metric="mm" aria-pressed="false">Dygn: högsta minus medel</button>
-      </div>
-      <div class="seg" role="group" aria-label="Period" id="seg-range2">
-        <button data-range="12" aria-pressed="true">12 mån</button>
-        <button data-range="24" aria-pressed="false">24 mån</button>
-        <button data-range="0" aria-pressed="false">Allt</button>
-      </div>
-    </div>
-    <div class="chart-block">
-      <h2>Dygnsspread per månad</h2>
-      <p class="sub">Staplarna visar månadens medelspread, prickarna den största enskilda dygnsspreaden. Euro per megawattimme.<sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
-      <div class="chart" id="chart-spread"></div>
-    </div>
-    <div class="chart-block">
-      <h2>Timmar med negativt pris</h2>
-      <p class="sub">Antal timmar per månad.<sup><a href="#n5">5</a></sup></p>
-      <div class="chart" id="chart-neg"></div>
     </div>
   </section>
 
   <!-- Duck curve -->
   <section class="panel" id="panel-duck" hidden>
-    <div class="zonebar" role="group" aria-label="Välj elområden">
-      <span class="zonebar-label">Elområden</span>
-      <div class="chips" id="zone-chips"></div>
-      <div class="quick" id="zonebar-quick">
-        <button data-quick="all">Alla</button>
-        <button data-quick="se">SE1–4</button>
-        <button data-quick="none">Inga</button>
-      </div>
-    </div>
     <p class="note alert" id="note-nozones"></p>
 
     <div class="controls">
@@ -292,6 +286,7 @@
       <div class="controls inner">
         <div class="seg" role="group" aria-label="Beräkning dagpris" id="seg-dn">
           <button data-dn="rolling" aria-pressed="true">Rullande 12 mån</button>
+          <button data-dn="rolling6" aria-pressed="false">Rullande 6 mån</button>
           <button data-dn="monthly" aria-pressed="false">Månadsvis</button>
         </div>
       </div>
@@ -304,6 +299,7 @@
       <div class="controls inner">
         <div class="seg" role="group" aria-label="Beräkning nattpris" id="seg-dn2">
           <button data-dn="rolling" aria-pressed="true">Rullande 12 mån</button>
+          <button data-dn="rolling6" aria-pressed="false">Rullande 6 mån</button>
           <button data-dn="monthly" aria-pressed="false">Månadsvis</button>
         </div>
       </div>
@@ -312,29 +308,56 @@
     </div>
   </section>
 
-  <!-- Säsong -->
-  <section class="panel" id="panel-season" hidden>
+  <!-- Solpark + BESS -->
+  <section class="panel" id="panel-solar" hidden>
+    <p class="note alert" id="note-solar"></p>
+    <div class="chart-block">
+      <h2>Fiktiv solpark med batteri</h2>
+      <p class="sub"><span id="solar-intro"></span><sup><a href="#n9">9</a>, <a href="#n10">10</a></sup></p>
+    </div>
+
+    <div class="chart-block">
+      <h2>Capture rate, senaste 12 månaderna</h2>
+      <p class="sub">Solparkens produktionsviktade pris i procent av områdets genomsnittspris, utan och med batteri på 1, 2 och 4 timmar.<sup><a href="#n1">1</a>, <a href="#n10">10</a></sup></p>
+      <div class="chart" id="chart-solar-rate"></div>
+    </div>
+
+    <div class="chart-block">
+      <h2>Capture price, senaste 12 månaderna</h2>
+      <p class="sub">Euro per producerad megawattimme. Batteriförluster är inräknade.<sup><a href="#n11">11</a></sup></p>
+      <div class="chart" id="chart-solar-price"></div>
+    </div>
+
+    <div class="chart-block">
+      <h2>Nyckeltal</h2>
+      <p class="sub">Höjningen visar capture price jämfört med solparken utan batteri. Andel via batteriet är den del av produktionen som laddas in, och cykler är urladdad energi delat med batteriets kapacitet.</p>
+      <div class="data-table-wrap" id="solar-table"></div>
+    </div>
+
     <div class="controls">
-      <label class="sel">Mått
-        <select id="sel-season">
-          <option value="wind_rate">Capture rate, vind</option>
-          <option value="solar_rate">Capture rate, sol</option>
-          <option value="wind_price">Capture price, vind</option>
-          <option value="solar_price">Capture price, sol</option>
-          <option value="spread_mean">Medelspread, högsta minus lägsta</option>
-          <option value="mm_mean">Medelspread, högsta minus medel</option>
-          <option value="base">Snittpris</option>
-          <option value="day_price">Dagpris kl 10–14</option>
-          <option value="night_price">Nattpris kl 00–04</option>
-          <option value="neg_share">Andel negativa timmar</option>
-        </select>
+      <label class="sel">Område för diagrammen nedan
+        <select id="sel-solzone"></select>
       </label>
     </div>
+
     <div class="chart-block">
-      <h2 id="season-title">Säsongsvariation</h2>
-      <p class="sub" id="season-sub"></p>
-      <div class="chart" id="chart-season"></div>
-      <p class="note" id="note-season"></p>
+      <h2 id="solar-monthly-title">Månad för månad</h2>
+      <p class="sub">Capture rate per månad för valt område.</p>
+      <div class="chart" id="chart-solar-monthly"></div>
+    </div>
+
+    <div class="chart-block">
+      <h2 id="solar-day-title">Exempeldag</h2>
+      <p class="sub">En typisk dag: den med medianproduktion i vald månad. Visar solproduktionen, vad som levereras efter batteriet och day-ahead-priset (höger axel).</p>
+      <div class="controls inner">
+        <label class="sel">Månad <select id="sel-solmonth"></select></label>
+        <div class="seg" role="group" aria-label="Batteri" id="seg-solscn">
+          <button data-scn="1h" aria-pressed="false">1 h</button>
+          <button data-scn="2h" aria-pressed="true">2 h</button>
+          <button data-scn="4h" aria-pressed="false">4 h</button>
+        </div>
+      </div>
+      <div class="chart" id="chart-solar-day"></div>
     </div>
   </section>
 
@@ -373,19 +396,22 @@
       <dd>Capture price delat med snittpriset, i procent. 100 % betyder att tekniken fått ett pris lika med snittet, och lägre värden betyder att produktionen ligger i timmar med lägre pris än genomsnittet.</dd>
 
       <dt>Rullande 12 månader</dt>
-      <dd>Samma beräkning över de senaste tolv månaderna i ett svep, viktat med produktionen. Det är inte ett medelvärde av tolv månadskvoter. I fliken Duck curve visar en streckad linje samma mått för de tolv månaderna dessförinnan (månad 13–24 bakåt), så att man ser förändring jämfört med året innan.</dd>
+      <dd>Samma beräkning över de senaste tolv månaderna i ett svep, viktat med produktionen. Det är inte ett medelvärde av tolv månadskvoter. I fliken Duck curve finns även rullande 6 månader för dag- och nattpris. Den streckade linjen visar då samma period ett år tidigare (för rullande 12 månader alltså månad 13–24 bakåt), så att man ser förändring jämfört med året innan.</dd>
 
       <dt>Dygnsspread</dt>
-      <dd>Skillnaden mellan dygnets högsta och lägsta timpris, i EUR/MWh. Alternativt visas högsta timpris minus dygnets medelpris. Staplarna visar medelvärdet över månadens dygn och prickarna det dygn som hade störst spread.</dd>
-
-      <dt>Timmar med negativt pris</dt>
-      <dd>Antal timmar i månaden då timmedelpriset var under noll.</dd>
+      <dd>Skillnaden mellan dygnets högsta och lägsta timpris, i EUR/MWh. Visas som medelvärde över månadens dygn, eller rullande över tolv månader.</dd>
 
       <dt>Andel negativa priser</dt>
       <dd>Timmar med negativt pris delat med samtliga timmar under perioden, i procent. "Senaste 12 mån" är de tolv senaste fullständiga månaderna och "Månad 13–24" de tolv månaderna dessförinnan.</dd>
 
       <dt>Dagpris och nattpris</dt>
       <dd>Medelvärdet av timpriserna kl 10–14 respektive kl 00–04 svensk tid, det vill säga timmarna som börjar 10, 11, 12 och 13 respektive 00, 01, 02 och 03.</dd>
+
+      <dt>Solpark + BESS</dt>
+      <dd>Beräkning för en fiktiv solpark på 1 MWp med batteri (BESS). Batteriet flyttar varje dygn produktion från de billigaste till de dyraste timmarna. "1 h", "2 h" och "4 h" anger hur länge batteriet kan leverera vid full effekt.</dd>
+
+      <dt>Andel via batteriet och cykler</dt>
+      <dd>Andel via batteriet är den del av solparkens produktion som laddas in i batteriet. Cykler är den energi som laddas ur under perioden delat med batteriets kapacitet, alltså antal fulla cykler.</dd>
 
       <dt>Duck curve</dt>
       <dd>Prisets form över dygnet. När mycket solkraft produceras mitt på dagen pressas priset ned, medan kvällen blir dyrare när solen försvinner. Kurvan liknar då en anka sedd från sidan.</dd>
@@ -400,6 +426,9 @@
       <li id="n6"><strong>Vilka månader som visas.</strong> Den pågående månaden visas inte, och inte heller månader där mer än 10 % av prisdata saknas. Produktionsdata revideras i efterhand av nätbolagen, så tidigare månader kan ändras något vid nästa uppdatering.</li>
       <li id="n7"><strong>Klockslag.</strong> Alla klockslag och dygn avser svensk tid (CET/CEST). "Kl 10–14" är timmarna 10, 11, 12 och 13, och "kl 00–04" är timmarna 00, 01, 02 och 03. Ett dag eller nattpris visas bara för månader där alla fyra timmarna finns.</li>
       <li id="n8"><strong>Dygnsprofil.</strong> Profilen är ett genomsnitt över alla dygn i perioden, viktat efter antal dygn per månad. Sommar är april–september och vinter oktober–mars. Genomsnittet döljer variationen mellan enskilda dygn, till exempel soliga och molniga dagar.</li>
+      <li id="n9"><strong>Solparken.</strong> Produktionen är beräknad med PVGIS för 1 MWp kristallint kisel i Halmstad (56,7° N, 12,9° Ö), 30° lutning, rakt mot söder och 14 % systemförluster. Profilen kommer från ett historiskt väderår och läggs på samma datum under de senaste tolv månaderna. Den följer alltså inte det faktiska vädret. I verkligheten faller priset ofta när det är soligt, så capture rate för en verklig park blir sannolikt något lägre än här. Halmstad ligger i SE4, och övriga områden visas som hypotetiska jämförelser med samma produktionsprofil.</li>
+      <li id="n10"><strong>Batterimodellen.</strong> Batteriets effekt är lika stor som parkens toppeffekt (1 MW per MWp). Varaktigheten är 1, 2 eller 4 timmar och verkningsgraden 88 % tur och retur. Batteriet laddas bara från solparken, aldrig från nätet, och är tomt vid dygnets slut. För varje dygn väljs de laddnings- och urladdningstimmar som ger högst intäkt, med kännedom om dygnets alla day-ahead-priser i förväg. Produktionen begränsas inte, och förluster i batteriet räknas som såld energi som uteblir.</li>
+      <li id="n11"><strong>Capture price med batteri</strong> är intäkten delat med solparkens produktion, inklusive batteriförluster. Capture rate är capture price delat med områdets genomsnittspris under samma period. Beräkningen innehåller inte nätavgifter, balanskostnader, intradagshandel, stödtjänster, åldring eller investeringskostnader och ska ses som en illustration av prisvärdet i day-ahead-marknaden.</li>
     </ol>
 
     <p class="disclaimer">Informationen är endast avsedd som underlag och utgör inte investerings- eller rådgivning. Data kan innehålla fel eller luckor. Valuta: euro.</p>
@@ -413,12 +442,12 @@
   'use strict';
 
   var MON = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-  var state = { zone: 'SE3', tab: 'capture', view: 'monthly', range: 12, metric: 'day', season: 'wind_rate', profile: 'all', dview: 'rolling', dn: 'rolling', duckZones: ['SE1', 'SE2', 'SE3', 'SE4'] };
+  var state = { zone: 'SE3', tab: 'capture', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h' };
   var DATA = null, RECENT = null;
 
   var qs = new URLSearchParams(location.search);
   if (qs.get('zone')) state.zone = qs.get('zone').toUpperCase();
-  if (['capture', 'spread', 'duck', 'season', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
+  if (['capture', 'duck', 'solar', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
 
   function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   function $(id) { return document.getElementById(id); }
@@ -512,128 +541,43 @@
   }
 
   /* ---------- Flik: Capture rate ---------- */
-  function renderCapture(z) {
-    var rolling = state.view === 'rolling';
-    var xs = tail(z.months, state.range).map(label);
-    function rateOf(zz, tech) { return pct(tail(rolling ? zz[tech].r_rate : zz[tech].rate, state.range)); }
-    function priceOf(zz, tech) { return tail(rolling ? zz[tech].r_price : zz[tech].price, state.range); }
-    function baseOf(zz) { return tail(rolling ? zz.r_base : zz.base, state.range); }
+  function renderCapture() {
+    var tech = state.tech, rolling = state.view === 'rolling';
+    var techName = tech === 'wind' ? 'vind' : 'sol';
+    var xs = tail(ALLM, state.range).map(label);
+    var rateBy = {}, priceBy = {}, baseBy = {};
+    DATA.order.forEach(function (k) {
+      var zz = DATA.zones[k], t = zz[tech];
+      rateBy[k] = tail(zoneVals(zz, pct(rolling ? t.r_rate : t.rate), ALLM), state.range);
+      priceBy[k] = tail(zoneVals(zz, rolling ? t.r_price : t.price, ALLM), state.range);
+      baseBy[k] = tail(zoneVals(zz, rolling ? zz.r_base : zz.base, ALLM), state.range);
+    });
+    var rateLists = DATA.order.map(function (k) { return rateBy[k]; });
+    var priceLists = DATA.order.map(function (k) { return priceBy[k]; }).concat(DATA.order.map(function (k) { return baseBy[k]; }));
+    var rateRange = niceRange(extentOf(rateLists), true, 110);
+    var priceRange = niceRange(extentOf(priceLists), true);
+    var mode = rolling ? 'lines' : 'lines+markers';
+    var suffix = rolling ? ', rullande 12 månader' : ' per månad';
+    var none = !selectedZones().length;
+    $('note-nozones-c').textContent = none ? 'Välj minst ett elområde i panelen ovan.' : '';
 
-    var rateRange = niceRange(globalExtent(function (zz) { return rateOf(zz, 'wind').concat(rateOf(zz, 'solar')); }), true, 110);
-    var priceRange = niceRange(globalExtent(function (zz) { return baseOf(zz).concat(priceOf(zz, 'wind'), priceOf(zz, 'solar')); }), true);
-
-    Plotly.react('chart-rate', [
-      { name: 'Vind', x: xs, y: rateOf(z, 'wind'), mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' },
-      { name: 'Sol', x: xs, y: rateOf(z, 'solar'), mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.0f} %' }
-    ], layout(xs, {
+    Plotly.react('chart-rate', zoneTraces({ cur: rateBy, prior: null }, xs, '%{y:.0f} %', '', mode), layout(xs, {
       yaxis: yAxis({ ticksuffix: ' %' }, rateRange),
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }]
     }), CONFIG);
+    $('rate-title').textContent = 'Capture rate, ' + techName + suffix;
+
+    Plotly.react('chart-price', zoneTraces({ cur: priceBy, prior: state.showBase ? baseBy : null }, xs, '%{y:.1f} €/MWh', 'snittpris', mode),
+      layout(xs, { yaxis: yAxis({ zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €' }, priceRange) }), CONFIG);
+    $('price-title').textContent = 'Capture price, ' + techName + suffix;
 
     var notes = [];
-    if (allNull(z.solar.rate)) notes.push('Solproduktion saknas eller är för ofullständigt rapporterad i ENTSO-E för ' + z.name + '. Jämför med Danmark (DK1/DK2), Finland (FI) eller Tyskland (DE).');
-    if (allNull(z.wind.rate)) notes.push('Vindproduktion saknas för ' + z.name + '.');
-    if (rolling) notes.push('Rullande 12 månader kräver tolv månader med data i följd, så kurvan börjar först efter ett års historik.');
+    var missing = selectedZones().filter(function (k) { return allNull(rateBy[k]); });
+    if (missing.length) notes.push('Ingen ' + (tech === 'wind' ? 'vindproduktion' : 'solproduktion') + ' rapporterad (eller för ofullständig) i ENTSO-E för: ' + missing.join(', ') + '.');
+    if (tech === 'solar' && !missing.length) notes.push('Solproduktion i Sverige är ofullständigt rapporterad i ENTSO-E, så Danmark, Finland och Tyskland är bättre referens.');
+    if (rolling) notes.push('Rullande 12 månader kräver tolv månader med data i följd, så linjerna börjar först efter ett års historik.');
     $('note-rate').textContent = notes.join(' ');
-    $('note-rate').className = 'note' + (notes.length && !rolling ? ' alert' : '');
-
-    Plotly.react('chart-price', [
-      { name: 'Snittpris', x: xs, y: baseOf(z), mode: 'lines', line: { color: css('--ink'), width: 2, dash: 'dot' }, hovertemplate: '%{y:.1f}' },
-      { name: 'Vind', x: xs, y: priceOf(z, 'wind'), mode: 'lines+markers', line: { color: css('--wind'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' },
-      { name: 'Sol', x: xs, y: priceOf(z, 'solar'), mode: 'lines+markers', line: { color: css('--solar'), width: 3 }, marker: { size: 6 }, hovertemplate: '%{y:.1f}' }
-    ], layout(xs, { yaxis: yAxis({ zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €' }, priceRange) }), CONFIG);
-  }
-
-  /* ---------- Flik: Spreadar ---------- */
-  function renderSpread(z) {
-    var xs = tail(z.months, state.range).map(label);
-    var meanKey = state.metric === 'day' ? 'spread_mean' : 'mm_mean';
-    var maxKey = state.metric === 'day' ? 'spread_max' : 'mm_max';
-    var spreadRange = niceRange(globalExtent(function (zz) {
-      return tail(zz.spread[meanKey], state.range).concat(tail(zz.spread[maxKey], state.range));
-    }), true);
-    var negRange = niceRange(globalExtent(function (zz) { return tail(zz.neg_hours, state.range); }), true);
-
-    Plotly.react('chart-spread', [
-      { type: 'bar', name: 'Medel per dygn', x: xs, y: tail(z.spread[meanKey], state.range), marker: { color: css('--ink') }, hovertemplate: '%{y:.0f} €/MWh' },
-      { type: 'scatter', mode: 'markers', name: 'Största dygnet', x: xs, y: tail(z.spread[maxKey], state.range), marker: { color: css('--solar'), size: 9, line: { color: css('--ink'), width: 1 } }, hovertemplate: '%{y:.0f} €/MWh' }
-    ], layout(xs, { yaxis: yAxis({ ticksuffix: ' €' }, spreadRange), bargap: 0.35 }), CONFIG);
-
-    Plotly.react('chart-neg', [
-      { type: 'bar', name: 'Timmar', x: xs, y: tail(z.neg_hours, state.range), marker: { color: css('--wind') }, hovertemplate: '%{y} timmar' }
-    ], layout(xs, { showlegend: false, yaxis: yAxis({}, negRange), bargap: 0.35 }), CONFIG);
-  }
-
-  /* ---------- Flik: Säsong ---------- */
-  var SEASON = {
-    wind_rate:   { label: 'capture rate, vind', scale: 100, suffix: ' %', ref100: true,
-                   desc: 'Procent av månadens snittpris. 100 % betyder att vinden fått snittpriset.',
-                   get: function (z) { return z.wind.rate; } },
-    solar_rate:  { label: 'capture rate, sol', scale: 100, suffix: ' %', ref100: true,
-                   desc: 'Procent av månadens snittpris. 100 % betyder att solen fått snittpriset.',
-                   get: function (z) { return z.solar.rate; } },
-    wind_price:  { label: 'capture price, vind', scale: 1, suffix: ' €',
-                   desc: 'Produktionsviktat pris i euro per megawattimme.',
-                   get: function (z) { return z.wind.price; } },
-    solar_price: { label: 'capture price, sol', scale: 1, suffix: ' €',
-                   desc: 'Produktionsviktat pris i euro per megawattimme.',
-                   get: function (z) { return z.solar.price; } },
-    spread_mean: { label: 'medelspread, högsta minus lägsta', scale: 1, suffix: ' €',
-                   desc: 'Medelvärde över månadens dygn, euro per megawattimme, räknat på timpriser.',
-                   get: function (z) { return z.spread.spread_mean; } },
-    mm_mean:     { label: 'medelspread, högsta minus medel', scale: 1, suffix: ' €',
-                   desc: 'Dygnets högsta timpris minus dygnsmedel, medel över månaden, euro per megawattimme.',
-                   get: function (z) { return z.spread.mm_mean; } },
-    base:        { label: 'snittpris', scale: 1, suffix: ' €',
-                   desc: 'Genomsnittligt day-ahead-pris, alla timmar lika viktade, euro per megawattimme.',
-                   get: function (z) { return z.base; } },
-    day_price:   { label: 'dagpris kl 10–14', scale: 1, suffix: ' €',
-                   desc: 'Medelpris för timmarna 10–14 (svensk tid), euro per megawattimme.',
-                   get: function (z) { return hpMean(z, 10, 14); } },
-    night_price: { label: 'nattpris kl 00–04', scale: 1, suffix: ' €',
-                   desc: 'Medelpris för timmarna 00–04 (svensk tid), euro per megawattimme.',
-                   get: function (z) { return hpMean(z, 0, 4); } },
-    neg_share:   { label: 'andel negativa timmar', scale: 1, suffix: ' %',
-                   desc: 'Andel av månadens timmar med negativt pris.',
-                   get: function (z) { return negShare(z); } }
-  };
-  var YEAR_COLORS = ['#cbd5d9', '#a5b8c0', '#7b98a6', '#4b7186', '#13242d'];
-
-  function renderSeason(z) {
-    var def = SEASON[state.season];
-    var scaled = function (zz) { return def.get(zz).map(function (v) { return v == null ? null : v * def.scale; }); };
-    var range = niceRange(globalExtent(scaled), true, def.ref100 ? 110 : null);
-
-    var byYear = {};
-    var vals = scaled(z);
-    z.months.forEach(function (m, i) {
-      var y = m.slice(0, 4), mi = parseInt(m.slice(5, 7), 10) - 1;
-      if (!byYear[y]) byYear[y] = [null, null, null, null, null, null, null, null, null, null, null, null];
-      byYear[y][mi] = vals[i];
-    });
-    var years = Object.keys(byYear).sort();
-    var xs = MON.map(function (m) { return m.charAt(0).toUpperCase() + m.slice(1); });
-
-    var traces = years.map(function (y, idx) {
-      var fromEnd = years.length - 1 - idx;
-      var latest = fromEnd === 0;
-      var color = YEAR_COLORS[Math.max(0, YEAR_COLORS.length - 1 - fromEnd)];
-      return {
-        name: y, x: xs, y: byYear[y], mode: 'lines+markers', connectgaps: false,
-        line: { color: color, width: latest ? 3.5 : 2.2 }, marker: { size: latest ? 7 : 5 },
-        hovertemplate: '%{y:.' + (def.scale === 100 ? 0 : 0) + 'f}' + def.suffix
-      };
-    });
-
-    var opts = { yaxis: yAxis({ ticksuffix: def.suffix }, range) };
-    if (def.ref100) opts.shapes = [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }];
-    Plotly.react('chart-season', traces, layout(xs, opts), CONFIG);
-
-    $('season-title').textContent = 'Säsong: ' + def.label + ', ' + z.name;
-    $('season-sub').textContent = 'Månadsvärden januari–december, en linje per år. ' + def.desc;
-    var note = 'Det senaste året visar bara fullständiga månader.';
-    if (allNull(vals)) note = 'Data saknas för detta mått och område. ' + note;
-    $('note-season').textContent = note;
+    $('note-rate').className = 'note' + (missing.length ? ' alert' : '');
   }
 
   /* ---------- Flik: Duck curve ---------- */
@@ -652,10 +596,6 @@
       for (var h = from; h < to; h++) if (row[h] != null) { s += row[h]; c++; }
       return c === (to - from) ? s / c : null;
     });
-  }
-  function negShare(z) {
-    if (!z.n) return nulls(z);
-    return z.neg_hours.map(function (v, i) { return (v == null || !z.n[i]) ? null : v / z.n[i] * 100; });
   }
   function rollW(vals, wts, w) {
     return vals.map(function (_, i) {
@@ -709,23 +649,23 @@
   }
 
   /* Valda områden (panelen som följer med) */
-  function selectedZones() { return DATA.order.filter(function (k) { return state.duckZones.indexOf(k) >= 0; }); }
+  function selectedZones() { return DATA.order.filter(function (k) { return state.selZones.indexOf(k) >= 0; }); }
   function renderZoneChips() {
     $('zone-chips').innerHTML = DATA.order.map(function (k) {
-      var on = state.duckZones.indexOf(k) >= 0, c = ZONE_COLORS[k] || '#888';
+      var on = state.selZones.indexOf(k) >= 0, c = ZONE_COLORS[k] || '#888';
       return '<button class="chip" data-zone="' + k + '" aria-pressed="' + on + '" title="' + DATA.zones[k].name + '">' +
              '<span class="dot" style="background:' + (on ? c : 'transparent') + ';border-color:' + c + '"></span>' + k + '</button>';
     }).join('');
   }
 
-  /* En serie per område över ALLM, ev. rullande 12 mån, samt samma serie 12 månader tidigare */
-  function trendSeries(getVals, getWts, rolling) {
-    var cur = {}, prior = rolling ? {} : null;
+  /* En serie per område över ALLM, ev. rullande över `win` månader, samt samma serie 12 månader tidigare */
+  function trendSeries(getVals, getWts, win) {
+    var cur = {}, prior = win ? {} : null;
     DATA.order.forEach(function (k) {
       var zz = DATA.zones[k], v = getVals(zz);
-      if (rolling) v = rollW(v, getWts(zz), 12);
+      if (win) v = rollW(v, getWts(zz), win);
       cur[k] = tail(v, state.range);
-      if (rolling) prior[k] = tail(shift12(v), state.range);
+      if (win) prior[k] = tail(shift12(v), state.range);
     });
     return { cur: cur, prior: prior };
   }
@@ -734,20 +674,19 @@
     if (ts.prior) lists = lists.concat(DATA.order.map(function (k) { return ts.prior[k]; }));
     return lists;
   }
-  function zoneTraces(ts, xs, hover) {
+  function zoneTraces(ts, xs, hover, priorLabel, mode) {
     var out = [];
     selectedZones().forEach(function (k) {
       var c = ZONE_COLORS[k] || '#888';
-      out.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: xs, y: ts.cur[k], connectgaps: false,
-                 line: { color: c, width: 2.8 }, hovertemplate: hover });
-      if (ts.prior) out.push({ type: 'scatter', mode: 'lines', name: k + ' (12 mån tidigare)', legendgroup: k, showlegend: false, x: xs, y: ts.prior[k], connectgaps: false,
+      out.push({ type: 'scatter', mode: mode || 'lines', name: k, legendgroup: k, x: xs, y: ts.cur[k], connectgaps: false,
+                 line: { color: c, width: 2.8 }, marker: { size: 5 }, hovertemplate: hover });
+      if (ts.prior) out.push({ type: 'scatter', mode: 'lines', name: k + ' (' + (priorLabel == null ? '12 mån tidigare' : priorLabel) + ')', legendgroup: k, showlegend: false, x: xs, y: ts.prior[k], connectgaps: false,
                  opacity: 0.8, line: { color: c, width: 2, dash: 'dot' }, hovertemplate: hover });
     });
     return out;
   }
 
   function renderDuck() {
-    renderZoneChips();
     if (!DATA.order.some(function (k) { return DATA.zones[k].hp; })) {
       $('note-profile').textContent = 'Den här fliken behöver nyare data. Ladda upp den nya update_data.py till GitHub och kör flödet igen.';
       return;
@@ -793,33 +732,137 @@
     $('negshare-sub').textContent = 'Andel av timmarna med negativt pris, alla områden oavsett val ovan. Senaste 12 mån = ' + rng(last12) + (prev12.length ? ', månad 13–24 = ' + rng(prev12) : '') + '.';
 
     /* 3. Dygnsspread */
-    rolling = state.dview === 'rolling';
+    var win = state.dview === 'rolling' ? 12 : 0;
     xs = tail(ALLM, state.range).map(label);
     var sp = trendSeries(
       function (zz) { return zoneVals(zz, zz.spread.spread_mean, ALLM); },
       function (zz) { return zoneVals(zz, zz.spread_days || zz.months.map(dim), ALLM); },
-      rolling);
+      win);
     Plotly.react('chart-spreadtrend', zoneTraces(sp, xs, '%{y:.0f} €/MWh'),
       layout(xs, { yaxis: yAxis({ ticksuffix: ' €' }, niceRange(extentOf(allLists(sp)), true)) }), CONFIG);
-    $('spreadtrend-title').textContent = rolling ? 'Dygnsspread, rullande 12 månader' : 'Dygnsspread per månad';
-    $('note-spreadtrend').textContent = rolling
+    $('spreadtrend-title').textContent = win ? 'Dygnsspread, rullande 12 månader' : 'Dygnsspread per månad';
+    $('note-spreadtrend').textContent = win
       ? 'Rullande 12 månader är ett medelvärde över alla dygn de senaste tolv månaderna och kräver ett års historik, så linjerna börjar först då. Streckad linje visar samma mått tolv månader tidigare (månad 13–24).'
       : '';
 
     /* 4 + 5. Dag- och nattpris, samma beräkningssätt och skala */
-    rolling = state.dn === 'rolling';
+    var dnWin = { rolling: 12, rolling6: 6, monthly: 0 }[state.dn];
     var monthDays = function (zz) { return zoneVals(zz, zz.months.map(dim), ALLM); };
-    var day = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 10, 14), ALLM); }, monthDays, rolling);
-    var night = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 0, 4), ALLM); }, monthDays, rolling);
+    var day = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 10, 14), ALLM); }, monthDays, dnWin);
+    var night = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 0, 4), ALLM); }, monthDays, dnWin);
     var dnRange = niceRange(extentOf(allLists(day).concat(allLists(night))), true);
     var dnLayout = function () { return layout(xs, { yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }, dnRange) }); };
-    Plotly.react('chart-day', zoneTraces(day, xs, '%{y:.1f} €/MWh'), dnLayout(), CONFIG);
-    Plotly.react('chart-night', zoneTraces(night, xs, '%{y:.1f} €/MWh'), dnLayout(), CONFIG);
-    $('day-title').textContent = rolling ? 'Dagpris kl 10–14, rullande 12 månader' : 'Dagpris kl 10–14 per månad';
-    $('night-title').textContent = rolling ? 'Nattpris kl 00–04, rullande 12 månader' : 'Nattpris kl 00–04 per månad';
-    $('note-dn').textContent = rolling
+    var dnPrior = dnWin === 6 ? 'samma period ett år tidigare' : '12 mån tidigare';
+    Plotly.react('chart-day', zoneTraces(day, xs, '%{y:.1f} €/MWh', dnPrior), dnLayout(), CONFIG);
+    Plotly.react('chart-night', zoneTraces(night, xs, '%{y:.1f} €/MWh', dnPrior), dnLayout(), CONFIG);
+    var dnText = dnWin ? ', rullande ' + dnWin + ' månader' : ' per månad';
+    $('day-title').textContent = 'Dagpris kl 10–14' + dnText;
+    $('night-title').textContent = 'Nattpris kl 00–04' + dnText;
+    $('note-dn').textContent = dnWin === 12
       ? 'Rullande 12 månader är ett medelvärde över de senaste tolv månaderna, viktat efter antal dygn. Streckad linje visar samma mått tolv månader tidigare (månad 13–24).'
-      : '';
+      : dnWin === 6
+        ? 'Rullande 6 månader är ett medelvärde över de senaste sex månaderna, viktat efter antal dygn. Streckad linje visar samma sexmånadersperiod ett år tidigare. Linjerna börjar efter sex månaders historik, och de streckade efter arton.'
+        : '';
+  }
+
+  /* ---------- Flik: Solpark + BESS ---------- */
+  var SOLAR = null;
+  var SC = ['none', '1h', '2h', '4h'];
+  var SC_NAME = { none: 'Utan BESS', '1h': '1 h BESS', '2h': '2 h BESS', '4h': '4 h BESS' };
+  var SC_COLOR = { none: '#b8c4c9', '1h': '#6fa8bd', '2h': '#2f7a97', '4h': '#13242d' };
+
+  function solarExtent(field, scale) {
+    var vals = [];
+    Object.keys(SOLAR.zones).forEach(function (k) {
+      SC.forEach(function (sc) { var v = SOLAR.zones[k].total[sc][field]; if (v != null) vals.push(v * scale); });
+    });
+    return extentOf([vals]);
+  }
+
+  function renderSolar() {
+    var note = $('note-solar');
+    if (!SOLAR) {
+      note.textContent = 'Den här fliken behöver nyare data. Ladda upp den nya update_data.py och requirements.txt till GitHub och kör flödet igen.';
+      return;
+    }
+    var site = SOLAR.site, win = site.window;
+    $('solar-intro').textContent = 'Fiktiv solpark på 1 MWp i ' + site.name + ' (' + site.tilt + '° lutning, rakt mot söder, produktionsprofil från PVGIS, väderår ' + site.year + '). Priser: day-ahead, de senaste 12 månaderna (' + label(win[0]) + '–' + label(win[win.length - 1]) + '). Batteriet laddas bara från solparken och flyttar varje dygn produktion från de billigaste till de dyraste timmarna. Effekt ' + fmt(site.bess_power_mw_per_mwp, 1) + ' MW per MWp och verkningsgrad ' + fmt(site.rte * 100) + ' % tur och retur.';
+    var zones = selectedZones().filter(function (k) { return SOLAR.zones[k]; });
+    note.textContent = zones.length ? '' : 'Välj minst ett elområde i panelen ovan.';
+    note.className = 'note alert';
+
+    /* 1 + 2. Stapeldiagram per område */
+    var xl = zones.map(function (k) { return k + '<br>snitt ' + fmt(SOLAR.zones[k].base) + ' €'; });
+    function bars(field, scale, texter, hover) {
+      return SC.map(function (sc) {
+        var y = zones.map(function (k) { var v = SOLAR.zones[k].total[sc][field]; return v == null ? null : v * scale; });
+        return { type: 'bar', name: SC_NAME[sc], x: xl, y: y, marker: { color: SC_COLOR[sc] },
+                 text: y.map(texter), textposition: 'outside', textfont: { size: 10 }, cliponaxis: false, hovertemplate: hover };
+      });
+    }
+    var rateExt = solarExtent('cr', 100), priceExt = solarExtent('cp', 1);
+    var rateRange = rateExt ? niceRange([0, rateExt[1] * 1.12], true, 100) : null;
+    var priceRange = priceExt ? niceRange([Math.min(0, priceExt[0]), priceExt[1] * 1.12], true) : null;
+    Plotly.react('chart-solar-rate', bars('cr', 100, function (v) { return v == null ? '' : fmt(v) + ' %'; }, '%{y:.0f} %'),
+      layout(xl, { barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' %' }, rateRange) }), CONFIG);
+    Plotly.react('chart-solar-price', bars('cp', 1, function (v) { return v == null ? '' : fmt(v) + ' €'; }, '%{y:.1f} €/MWh'),
+      layout(xl, { barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' €' }, priceRange) }), CONFIG);
+
+    /* 3. Nyckeltal */
+    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Scenario</th><th>Capture price</th><th>Capture rate</th><th>Höjning</th><th>Via batteriet</th><th>Cykler</th></tr></thead><tbody>';
+    zones.forEach(function (k) {
+      var t = SOLAR.zones[k].total, base = t.none.cp;
+      SC.forEach(function (sc, i) {
+        var e = t[sc], up = (sc !== 'none' && e.cp != null && base != null) ? e.cp - base : null;
+        html += '<tr' + (i === 0 ? ' class="first"' : '') + '><td>' + (i === 0 ? '<strong>' + k + '</strong>' : '') + '</td><td>' + SC_NAME[sc] + '</td>' +
+          '<td>' + (e.cp == null ? '–' : fmt(e.cp, 1) + ' €') + '</td>' +
+          '<td>' + (e.cr == null ? '–' : fmt(e.cr * 100) + ' %') + '</td>' +
+          '<td' + (up != null && up > 0 ? ' class="pos"' : '') + '>' + (up == null ? '–' : '+' + fmt(up, 1) + ' € (' + fmt(up / base * 100) + ' %)') + '</td>' +
+          '<td>' + (e.share == null ? '–' : fmt(e.share * 100) + ' %') + '</td>' +
+          '<td>' + (e.cycles == null ? '–' : fmt(e.cycles)) + '</td></tr>';
+      });
+    });
+    $('solar-table').innerHTML = html + '</tbody></table>';
+
+    /* 4. Valt område: månad för månad + exempeldag */
+    var keys = Object.keys(SOLAR.zones);
+    if (!SOLAR.zones[state.solZone]) state.solZone = keys[0];
+    $('sel-solzone').innerHTML = keys.map(function (k) { return '<option value="' + k + '"' + (k === state.solZone ? ' selected' : '') + '>' + SOLAR.zones[k].name + '</option>'; }).join('');
+    var zs = SOLAR.zones[state.solZone];
+    var mx = zs.monthly.months.map(label);
+    var allMonthly = [];
+    keys.forEach(function (k) { SC.forEach(function (sc) { allMonthly.push(SOLAR.zones[k].monthly[sc].cr.map(function (v) { return v == null ? null : v * 100; })); }); });
+    var mRange = niceRange(extentOf(allMonthly), true, 110);
+    Plotly.react('chart-solar-monthly', SC.map(function (sc) {
+      return { type: 'scatter', mode: 'lines+markers', name: SC_NAME[sc], x: mx, connectgaps: false,
+               y: zs.monthly[sc].cr.map(function (v) { return v == null ? null : v * 100; }),
+               line: { color: SC_COLOR[sc], width: sc === 'none' ? 2.2 : 2.8, dash: sc === 'none' ? 'dot' : 'solid' }, marker: { size: 5 }, hovertemplate: '%{y:.0f} %' };
+    }), layout(mx, { yaxis: yAxis({ ticksuffix: ' %' }, mRange),
+      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }] }), CONFIG);
+    $('solar-monthly-title').textContent = 'Månad för månad, ' + zs.name;
+
+    var ex = zs.examples || [];
+    if (!ex.length) { return; }
+    if (!state.solMonth || !ex.some(function (e) { return e.month === state.solMonth; })) {
+      var best = ex.reduce(function (a, e) { var t = e.pv.reduce(function (x, y) { return x + y; }, 0); return t > a.t ? { t: t, m: e.month } : a; }, { t: -1, m: ex[0].month });
+      state.solMonth = best.m;
+    }
+    $('sel-solmonth').innerHTML = ex.map(function (e) { return '<option value="' + e.month + '"' + (e.month === state.solMonth ? ' selected' : '') + '>' + label(e.month) + '</option>'; }).join('');
+    var e = ex.filter(function (x) { return x.month === state.solMonth; })[0];
+    var hours = e.p.map(function (_, i) { return ('0' + i).slice(-2); });
+    var out = e[state.solScn];
+    var ymax = Math.max.apply(null, e.pv.concat(out)) * 1.12 || 1;
+    var pmin = Math.min(0, Math.min.apply(null, e.p)), pmax = Math.max.apply(null, e.p) * 1.12 || 1;
+    Plotly.react('chart-solar-day', [
+      { type: 'scatter', mode: 'lines', name: 'Solproduktion', x: hours, y: e.pv, line: { color: css('--solar'), width: 1, shape: 'hv' }, fill: 'tozeroy', fillcolor: 'rgba(226,154,14,0.40)', hovertemplate: '%{y:.2f} MW' },
+      { type: 'scatter', mode: 'lines', name: 'Levererat efter ' + SC_NAME[state.solScn].replace(' BESS', ' batteri'), x: hours, y: out, line: { color: SC_COLOR['4h'], width: 2.6, shape: 'hv' }, hovertemplate: '%{y:.2f} MW' },
+      { type: 'scatter', mode: 'lines', name: 'Pris (höger axel)', x: hours, y: e.p, yaxis: 'y2', line: { color: css('--wind'), width: 2, dash: 'dot', shape: 'hv' }, hovertemplate: '%{y:.0f} €/MWh' }
+    ], layout(hours, {
+      margin: { l: 52, r: 56, t: 10, b: 44 },
+      yaxis: yAxis({ ticksuffix: ' MW' }, [0, ymax]),
+      yaxis2: { overlaying: 'y', side: 'right', range: [pmin, pmax], ticksuffix: ' €', showgrid: false, zeroline: false, fixedrange: true }
+    }), CONFIG);
+    $('solar-day-title').textContent = 'Exempeldag ' + e.date + ', ' + zs.name;
   }
 
   /* ---------- Flik: Pris och produktion ---------- */
@@ -862,29 +905,30 @@
     if (!z) { state.zone = DATA.order[0]; z = DATA.zones[state.zone]; }
     renderZones();
     renderKpis(z);
-    var onDuck = state.tab === 'duck';
-    ['zones', 'kpis', 'axis-note'].forEach(function (id) { $(id).hidden = onDuck; });
+    var multi = state.tab === 'capture' || state.tab === 'duck' || state.tab === 'solar';
+    ['zones', 'kpis', 'axis-note'].forEach(function (id) { $(id).hidden = multi; });
+    $('zonebar').hidden = !multi;
+    if (multi) renderZoneChips();
 
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
     });
-    ['capture', 'spread', 'duck', 'season', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
-    $('sel-season').value = state.season;
+    ['capture', 'duck', 'solar', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
 
     setPressed('seg-view', 'data-view', state.view);
     setPressed('seg-range', 'data-range', state.range);
-    setPressed('seg-range2', 'data-range', state.range);
-    setPressed('seg-metric', 'data-metric', state.metric);
+    setPressed('seg-tech', 'data-tech', state.tech);
+    setPressed('seg-solscn', 'data-scn', state.solScn);
+    setPressed('seg-base', 'data-base', state.showBase ? 'on' : 'off');
     setPressed('seg-range3', 'data-range', state.range);
     setPressed('seg-profile', 'data-profile', state.profile);
     setPressed('seg-dview', 'data-dview', state.dview);
     setPressed('seg-dn', 'data-dn', state.dn);
     setPressed('seg-dn2', 'data-dn', state.dn);
 
-    if (state.tab === 'capture') renderCapture(z);
-    if (state.tab === 'spread') renderSpread(z);
+    if (state.tab === 'capture') renderCapture();
     if (state.tab === 'duck') renderDuck();
-    if (state.tab === 'season') renderSeason(z);
+    if (state.tab === 'solar') renderSolar();
     if (state.tab === 'recent') renderRecent();
   }
 
@@ -897,7 +941,7 @@
       var b = e.target.closest('button'); if (!b) return;
       state.view = b.dataset.view; renderAll();
     });
-    ['seg-range', 'seg-range2', 'seg-range3'].forEach(function (id) {
+    ['seg-range', 'seg-range3'].forEach(function (id) {
       $(id).addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         state.range = parseInt(b.dataset.range, 10); renderAll();
@@ -915,26 +959,33 @@
     });
     $('zone-chips').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      var k = b.dataset.zone, i = state.duckZones.indexOf(k);
-      if (i >= 0) state.duckZones.splice(i, 1); else state.duckZones.push(k);
+      var k = b.dataset.zone, i = state.selZones.indexOf(k);
+      if (i >= 0) state.selZones.splice(i, 1); else state.selZones.push(k);
       renderAll();
     });
     $('zonebar-quick').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       var q = b.dataset.quick;
-      state.duckZones = q === 'all' ? DATA.order.slice() : q === 'se' ? DATA.order.filter(function (k) { return /^SE/.test(k); }) : [];
+      state.selZones = q === 'all' ? DATA.order.slice() : q === 'se' ? DATA.order.filter(function (k) { return /^SE/.test(k); }) : [];
       renderAll();
     });
     $('seg-dview').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       state.dview = b.dataset.dview; renderAll();
     });
-    $('sel-season').addEventListener('change', function (e) {
-      state.season = e.target.value; renderAll();
-    });
-    $('seg-metric').addEventListener('click', function (e) {
+    $('sel-solzone').addEventListener('change', function (e) { state.solZone = e.target.value; renderAll(); });
+    $('sel-solmonth').addEventListener('change', function (e) { state.solMonth = e.target.value; renderAll(); });
+    $('seg-solscn').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      state.metric = b.dataset.metric; renderAll();
+      state.solScn = b.dataset.scn; renderAll();
+    });
+    $('seg-tech').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.tech = b.dataset.tech; renderAll();
+    });
+    $('seg-base').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.showBase = b.dataset.base === 'on'; renderAll();
     });
   }
 
@@ -946,9 +997,10 @@
 
   Promise.all([
     fetch('data/summary.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('summary'); return r.json(); }),
-    fetch('data/recent.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('recent'); return r.json(); })
+    fetch('data/recent.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('recent'); return r.json(); }),
+    fetch('data/solar_bess.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
   ]).then(function (res) {
-    DATA = res[0]; RECENT = res[1];
+    DATA = res[0]; RECENT = res[1]; SOLAR = res[2];
     var seen = {};
     DATA.order.forEach(function (k) {
       var zz = DATA.zones[k];
