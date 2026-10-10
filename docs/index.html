@@ -131,6 +131,11 @@
   .data-table tr.first td { border-top: 2px solid var(--line); }
   .data-table td.pos { color: #11704a; font-weight: 600; }
 
+  .slider-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 8px 0 6px; font-size: 14px; }
+  .slider-row label { font-weight: 600; }
+  .slider-row input[type="range"] { flex: 1 1 220px; max-width: 420px; accent-color: var(--ink); }
+  .slider-row output { font: 700 15px var(--font-head); min-width: 130px; }
+
   /* Diagram */
   .panel[hidden] { display: none; }
   .chart-block { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 6px; margin-bottom: 16px; }
@@ -185,6 +190,7 @@
     <button role="tab" data-tab="capture" aria-selected="true">Capture rate</button>
     <button role="tab" data-tab="duck" aria-selected="false">Duck curve</button>
     <button role="tab" data-tab="solar" aria-selected="false">Solpark + BESS</button>
+    <button role="tab" data-tab="depth" aria-selected="false">Arbitragedjup</button>
     <button role="tab" data-tab="recent" aria-selected="false">Pris och produktion</button>
   </div>
 
@@ -361,6 +367,83 @@
     </div>
   </section>
 
+  <!-- Arbitragedjup -->
+  <section class="panel" id="panel-depth" hidden>
+    <p class="note alert" id="note-depth"></p>
+    <div class="chart-block">
+      <h2>Hur många batterier tål arbitragemarknaden?</h2>
+      <p class="sub">Modell av day-ahead-arbitrage när fler batterier kommer in. Flottan laddar och laddar ur på dygnets billigaste och dyraste timmar, och det flyttar själva priset. Vid vilken flottstorlek faller intäkten per MW, och hur mycket krymper spreaden? Det beror på hur känsligt priset är. Det skattas från historisk last, vind, sol och pris (se längre ned), eller så ställer du in det själv.<sup><a href="#n12">12</a>, <a href="#n13">13</a></sup></p>
+      <div class="controls inner">
+        <div class="seg" role="group" aria-label="Batteriets varaktighet" id="seg-depthdur">
+          <button data-ddur="1h" aria-pressed="false">1 h</button>
+          <button data-ddur="2h" aria-pressed="true">2 h</button>
+          <button data-ddur="4h" aria-pressed="false">4 h</button>
+        </div>
+        <div class="seg" role="group" aria-label="Flottans storlek på x-axeln" id="seg-depthmax">
+          <button data-dmax="5" aria-pressed="false">0–5 GW</button>
+          <button data-dmax="10" aria-pressed="true">0–10 GW</button>
+          <button data-dmax="20" aria-pressed="false">0–20 GW</button>
+        </div>
+      </div>
+      <div class="controls inner">
+        <div class="seg" role="group" aria-label="Källa för prispåverkan" id="seg-depthmode">
+          <button data-dmode="est" aria-pressed="true">Skattad från data</button>
+          <button data-dmode="manual" aria-pressed="false">Manuell</button>
+        </div>
+      </div>
+      <div class="slider-row">
+        <label for="rng-depth">Prispåverkan</label>
+        <input type="range" id="rng-depth" min="0.5" max="10" step="0.5" value="2" aria-describedby="depth-help">
+        <output id="depth-s-label"></output>
+        <div class="seg" role="group" aria-label="Förinställningar" id="seg-depthpre">
+          <button data-dpre="1">Djup</button>
+          <button data-dpre="3">Medel</button>
+          <button data-dpre="8">Grund</button>
+        </div>
+      </div>
+      <p class="note" id="depth-help"></p>
+      <p class="note alert" id="depth-est-note"></p>
+    </div>
+
+    <div class="chart-block">
+      <h2>Intäkt per MW och år, efter flottans storlek</h2>
+      <p class="sub">Kilo-euro per installerad MW och år från day-ahead-arbitrage. Rutan markerar där intäkten har halverats jämfört med första MW.</p>
+      <div class="chart" id="chart-depth-rev"></div>
+    </div>
+
+    <div class="chart-block">
+      <h2>Dygnsspread efter batterierna</h2>
+      <p class="sub">Genomsnittlig skillnad mellan dygnets högsta och lägsta timpris i euro per megawattimme, när flottan har gjort sitt jobb.</p>
+      <div class="chart" id="chart-depth-spread"></div>
+    </div>
+
+    <div class="chart-block">
+      <h2>Mättnadspunkter</h2>
+      <p class="sub">Flottans storlek (i GW) där intäkten per MW har sjunkit till 75, 50 respektive 25 % av första MW:s intäkt, vid vald prispåverkan.</p>
+      <div class="data-table-wrap" id="depth-table"></div>
+      <p class="note" id="note-depth-ref"></p>
+    </div>
+
+    <div class="chart-block">
+      <h2>Empiriskt underlag: hur mycket rör sig priset per GW?</h2>
+      <p class="sub">Skattningen jämför timpriset med restlasten (förbrukning minus vind och sol) de senaste 24 månaderna, med hänsyn till månad och timme på dygnet. Vind och väder gör att restlasten varierar av sig själv, och priset följer. Det är samma sak som ett batteri gör när det laddar eller laddar ur.<sup><a href="#n14">14</a>, <a href="#n15">15</a></sup></p>
+      <div class="data-table-wrap" id="slope-table"></div>
+      <p class="note" id="note-slope"></p>
+    </div>
+
+    <div class="chart-block">
+      <h2>Sambandet pris mot restlast</h2>
+      <p class="sub">Genomsnittligt prisavvikelse (euro per MWh) för tjugo lika stora grupper av timmar sorterade efter restlast (GW, avvikelse från normalt för månad och klockslag). Punkterna visar om sambandet är rakt, och den streckade linjen är den skattade lutningen.</p>
+      <div class="chart" id="chart-slope-bins"></div>
+    </div>
+
+    <div class="chart-block">
+      <h2>Prispåverkan över dygnet</h2>
+      <p class="sub">Samma skattning uppdelad på tid på dygnet, med 95 %-intervall. Batterier laddar oftast på natten och mitt på dagen och laddar ur på kvällen.</p>
+      <div class="chart" id="chart-slope-dayparts"></div>
+    </div>
+  </section>
+
   <!-- Senaste dygnen -->
   <section class="panel" id="panel-recent" hidden>
     <div class="chart-block">
@@ -413,6 +496,12 @@
       <dt>Andel via batteriet och cykler</dt>
       <dd>Andel via batteriet är den del av solparkens produktion som laddas in i batteriet. Cykler är den energi som laddas ur under perioden delat med batteriets kapacitet, alltså antal fulla cykler.</dd>
 
+      <dt>Arbitragedjup</dt>
+      <dd>Hur stor batteriflotta day-ahead-marknaden kan absorbera innan arbitrage slutar löna sig. Mättnadspunkt är den flottstorlek där intäkten per MW har fallit till en given andel av första MW:s intäkt.</dd>
+
+      <dt>Prispåverkan</dt>
+      <dd>Hur många euro per megawattimme priset flyttar när en flotta på 1 GW laddar (priset stiger) eller laddar ur (priset sjunker) med full effekt. Det är modellens viktigaste och mest osäkra antagande.</dd>
+
       <dt>Duck curve</dt>
       <dd>Prisets form över dygnet. När mycket solkraft produceras mitt på dagen pressas priset ned, medan kvällen blir dyrare när solen försvinner. Kurvan liknar då en anka sedd från sidan.</dd>
     </dl>
@@ -429,6 +518,10 @@
       <li id="n9"><strong>Solparken.</strong> Produktionen är beräknad med PVGIS för 1 MWp kristallint kisel i Halmstad (56,7° N, 12,9° Ö), 30° lutning, rakt mot söder och 14 % systemförluster. Profilen kommer från ett historiskt väderår och läggs på samma datum under de senaste tolv månaderna. Den följer alltså inte det faktiska vädret. I verkligheten faller priset ofta när det är soligt, så capture rate för en verklig park blir sannolikt något lägre än här. Halmstad ligger i SE4, och övriga områden visas som hypotetiska jämförelser med samma produktionsprofil.</li>
       <li id="n10"><strong>Batterimodellen.</strong> Batteriets effekt är lika stor som parkens toppeffekt (1 MW per MWp). Varaktigheten är 1, 2 eller 4 timmar och verkningsgraden 88 % tur och retur. Batteriet laddas bara från solparken, aldrig från nätet, och är tomt vid dygnets slut. För varje dygn väljs de laddnings- och urladdningstimmar som ger högst intäkt, med kännedom om dygnets alla day-ahead-priser i förväg. Produktionen begränsas inte, och förluster i batteriet räknas som såld energi som uteblir.</li>
       <li id="n11"><strong>Capture price med batteri</strong> är intäkten delat med solparkens produktion, inklusive batteriförluster. Capture rate är capture price delat med områdets genomsnittspris under samma period. Beräkningen innehåller inte nätavgifter, balanskostnader, intradagshandel, stödtjänster, åldring eller investeringskostnader och ska ses som en illustration av prisvärdet i day-ahead-marknaden.</li>
+      <li id="n12"><strong>Modellen för arbitragedjup.</strong> Flottan består av identiska batterier med effekt N och varaktighet 1, 2 eller 4 timmar, verkningsgrad 88 % tur och retur, och laddar bara från nätet. Batterierna är prisundertagare med full framförhållning på dygnets day-ahead-priser, och är tomma vid dygnets slut. Priset den timmen flyttas linjärt med flottans nettoflöde (prispåverkan i euro per MWh och GW). Genom att batterierna drar upp priset när de laddar och trycker ner det när de laddar ur sjunker intäkten per MW när flottan växer. Beräkningen bygger på timpriser för var fjärde dygn de senaste 12 månaderna, uppräknat till ett år.</li>
+      <li id="n13"><strong>Begränsningar.</strong> Resultatet beror helt på prispåverkan. Modellen har en enda prisnivå per område och tar inte hänsyn till handel med grannområden som späder ut effekten, till att utbud och efterfrågan ändras över tid, eller till att batterier även säljer på intradag och stödtjänstmarknader. Den räknar inte med nätavgifter, drift, åldring eller investeringskostnader. Den visar en övre gräns för vad day-ahead-arbitrage ger, och inte vad en enskild anläggning kommer att tjäna.</li>
+      <li id="n14"><strong>Hur prispåverkan skattas.</strong> Per område görs en regression av timpris mot restlast (förbrukning minus vind och sol, i GW) de senaste 24 månaderna, med fasta effekter för månad (som fångar bränslepris och vattenläge) och för timme på dygnet uppdelat på vardag och helg. Priset begränsas till 1:a–99:e percentilen så att enstaka toppar inte styr. Standardfel är klusterrobusta per vecka. För alla områden utom Tyskland kontrolleras också för tyska restlasten, eftersom vädret samvarierar och områdena prissätts tillsammans. Skattningen utan den kontrollen visas också och blir ofta för hög.</li>
+      <li id="n15"><strong>Vad skattningen inte visar.</strong> Den mäter hur priset har rört sig vid de variationer i restlast som faktiskt förekommit, ofta några hundra MW till någon GW i ett svenskt område. En batteriflotta på flera GW ligger utanför det intervallet, och då är linjen en extrapolering. När batterierna fyller upp överföringsförbindelserna till grannområden kopplas områdena loss och priset blir känsligare, så verklig mättnad kan komma snabbare än en rak linje antyder. Sambandet påverkas också av saker som inte ingår, till exempel flöden, kärnkraftsrevisioner och vattenläge.</li>
     </ol>
 
     <p class="disclaimer">Informationen är endast avsedd som underlag och utgör inte investerings- eller rådgivning. Data kan innehålla fel eller luckor. Valuta: euro.</p>
@@ -442,12 +535,12 @@
   'use strict';
 
   var MON = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-  var state = { zone: 'SE3', tab: 'capture', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h' };
+  var state = { zone: 'SE3', tab: 'capture', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', depthDur: '2h', depthS: 2, depthMax: 10, depthMode: 'est' };
   var DATA = null, RECENT = null;
 
   var qs = new URLSearchParams(location.search);
   if (qs.get('zone')) state.zone = qs.get('zone').toUpperCase();
-  if (['capture', 'duck', 'solar', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
+  if (['capture', 'duck', 'solar', 'depth', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
 
   function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   function $(id) { return document.getElementById(id); }
@@ -787,6 +880,7 @@
     }
     var site = SOLAR.site, win = site.window;
     $('solar-intro').textContent = 'Fiktiv solpark på 1 MWp i ' + site.name + ' (' + site.tilt + '° lutning, rakt mot söder, produktionsprofil från PVGIS, väderår ' + site.year + '). Priser: day-ahead, de senaste 12 månaderna (' + label(win[0]) + '–' + label(win[win.length - 1]) + '). Batteriet laddas bara från solparken och flyttar varje dygn produktion från de billigaste till de dyraste timmarna. Effekt ' + fmt(site.bess_power_mw_per_mwp, 1) + ' MW per MWp och verkningsgrad ' + fmt(site.rte * 100) + ' % tur och retur.';
+    if (site.annual_kwh_per_kwp) $('solar-intro').textContent += ' Profilens årsproduktion är ' + fmt(site.annual_kwh_per_kwp) + ' kWh per kWp, som du kan jämföra med PVGIS webbverktyg för samma inställningar.';
     var zones = selectedZones().filter(function (k) { return SOLAR.zones[k]; });
     note.textContent = zones.length ? '' : 'Välj minst ett elområde i panelen ovan.';
     note.className = 'note alert';
@@ -865,6 +959,144 @@
     $('solar-day-title').textContent = 'Exempeldag ' + e.date + ', ' + zs.name;
   }
 
+  /* ---------- Flik: Arbitragedjup ---------- */
+  var DEPTH = null, SLOPE = null;
+
+  function interpK(xs, ys, x) {
+    if (x <= xs[0]) return ys[0];
+    for (var i = 1; i < xs.length; i++) {
+      if (x <= xs[i]) { var t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]); return ys[i - 1] + t * (ys[i] - ys[i - 1]); }
+    }
+    return ys[ys.length - 1];
+  }
+  function depthCurve(zone, field, s, grid) {
+    var r = DEPTH.zones[zone].res[state.depthDur][field];
+    return grid.map(function (n) { return interpK(DEPTH.kappa, r, s * n); });
+  }
+  /* flottstorlek (GW) där intäkten per MW har fallit till andelen frac av första MW */
+  function saturationAt(zone, s, frac) {
+    var r = DEPTH.zones[zone].res[state.depthDur].rev, target = r[0] * frac;
+    if (!(r[0] > 0)) return null;
+    for (var i = 1; i < r.length; i++) {
+      if (r[i] <= target) {
+        var t = (r[i - 1] - target) / (r[i - 1] - r[i]);
+        return (DEPTH.kappa[i - 1] + t * (DEPTH.kappa[i] - DEPTH.kappa[i - 1])) / s;
+      }
+    }
+    return null;
+  }
+  function slopeFor(k) {
+    var e = SLOPE && SLOPE.zones[k];
+    if (!e) return null;
+    var c = e[e.central];
+    if (!c) return null;
+    return { c: Math.max(c.b, 0.05), lo: Math.max(c.lo, 0.05), hi: Math.max(c.hi, 0.05), flat: c.lo <= 0.05, raw: c };
+  }
+  function rgba(hex, a) {
+    var n = parseInt(hex.slice(1), 16);
+    return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  function pushBand(arr, k, color, upper, lower, grid) {
+    arr.push({ type: 'scatter', mode: 'lines', x: grid, y: upper, line: { width: 0, color: color }, legendgroup: k, showlegend: false, hoverinfo: 'skip' });
+    arr.push({ type: 'scatter', mode: 'lines', x: grid, y: lower, line: { width: 0, color: color }, fill: 'tonexty', fillcolor: rgba(color, 0.18), legendgroup: k, showlegend: false, hoverinfo: 'skip' });
+  }
+
+  function renderDepth() {
+    var note = $('note-depth');
+    if (!DEPTH) {
+      note.textContent = 'Den här fliken behöver nyare data. Ladda upp den nya update_data.py till GitHub och kör flödet igen. Beräkningen tar ett tag första gången.';
+      return;
+    }
+    var zones = selectedZones().filter(function (k) { return DEPTH.zones[k]; });
+    note.textContent = zones.length ? '' : 'Välj minst ett elområde i panelen ovan.';
+    var est = state.depthMode === 'est' && !!SLOPE;
+    var s = state.depthS, maxN = state.depthMax, dur = state.depthDur;
+    $('rng-depth').value = String(s);
+    $('rng-depth').disabled = est;
+    $('depth-s-label').textContent = est ? 'skattad per område' : fmt(s, 1) + ' €/MWh per GW';
+    $('depth-help').textContent = est
+      ? 'Prispåverkan är skattad per område från historisk last, vind, sol och pris (se Empiriskt underlag längre ned). Det skuggade bandet är 95 %-intervallet. Skattningen bygger på variationer i restlast av begränsad storlek, så stora flottor är en extrapolering.'
+      : 'Prispåverkan är hur många euro per megawattimme priset flyttar när en flotta på 1 GW laddar eller laddar ur med full effekt. Lågt värde är en djup marknad som tål många batterier, och högt värde en grund marknad som mättas fort. Kurvans form går att lita mer på än det exakta GW-talet.';
+    if (!SLOPE) $('depth-est-note').textContent = 'Skattningen saknas ännu (den kräver att förbrukning hämtas från ENTSO-E). Kör flödet igen, så visas den. Tills dess gäller reglaget.';
+    else $('depth-est-note').textContent = '';
+
+    var grid = [];
+    for (var i = 0; i <= 80; i++) grid.push(maxN * i / 80);
+    var all = Object.keys(DEPTH.zones);
+    var rev0Max = Math.max.apply(null, all.map(function (k) { return DEPTH.zones[k].res[dur].rev[0]; }));
+    var spr0Max = Math.max.apply(null, all.map(function (k) { return DEPTH.zones[k].spread0; }));
+    var xaxis = { type: 'linear', range: [0, maxN], ticksuffix: ' GW', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true };
+
+    var revTr = [], sprTr = [], noEst = [], used = {};
+    zones.forEach(function (k) {
+      var c = ZONE_COLORS[k] || '#888', zz = DEPTH.zones[k];
+      var sl = est ? slopeFor(k) : null;
+      if (est && !sl) noEst.push(k);
+      var sc = sl ? sl.c : s;
+      used[k] = { c: sc, lo: sl ? sl.lo : sc, hi: sl ? sl.hi : sc, sl: sl };
+      if (sl) {
+        pushBand(revTr, k, c, depthCurve(k, 'rev', sl.lo, grid), depthCurve(k, 'rev', sl.hi, grid), grid);
+        pushBand(sprTr, k, c, depthCurve(k, 'spread', sl.lo, grid), depthCurve(k, 'spread', sl.hi, grid), grid);
+      }
+      revTr.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: grid, y: depthCurve(k, 'rev', sc, grid), line: { color: c, width: 2.8 }, hovertemplate: '%{y:.0f} k€/MW' });
+      var n50 = saturationAt(k, sc, 0.5);
+      if (n50 != null && n50 <= maxN) revTr.push({ type: 'scatter', mode: 'markers', name: k + ' (halverad)', legendgroup: k, showlegend: false, x: [n50], y: [zz.res[dur].rev[0] * 0.5],
+        marker: { symbol: 'diamond', size: 11, color: c, line: { color: css('--ink'), width: 1.5 } }, hovertemplate: 'Halverad intäkt vid %{x:.1f} GW<extra>' + k + '</extra>' });
+      sprTr.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: grid, y: depthCurve(k, 'spread', sc, grid), line: { color: c, width: 2.8 }, hovertemplate: '%{y:.0f} €/MWh' });
+    });
+    if (noEst.length) $('depth-est-note').textContent = 'Skattning saknas för ' + noEst.join(', ') + ', där reglaget (' + fmt(s, 1) + ' €/MWh per GW) används i stället.';
+    Plotly.react('chart-depth-rev', revTr, layout(grid, { xaxis: xaxis, hovermode: 'x unified', yaxis: yAxis({ ticksuffix: ' k€' }, niceRange([0, rev0Max * 1.06], true)) }), CONFIG);
+    Plotly.react('chart-depth-spread', sprTr, layout(grid, { xaxis: xaxis, hovermode: 'x unified', yaxis: yAxis({ ticksuffix: ' €' }, niceRange([0, spr0Max * 1.06], true)) }), CONFIG);
+
+    /* mättnadspunkter, med osäkerhetsintervall när prispåverkan är skattad */
+    var maxK = DEPTH.kappa[DEPTH.kappa.length - 1];
+    var gw = function (n, sv) { return n == null ? '&gt; ' + fmt(maxK / sv) : fmt(n, n < 1 ? 2 : 1); };
+    var cell = function (k, f) {
+      var u = used[k], c = saturationAt(k, u.c, f);
+      if (!u.sl) return gw(c, u.c) + ' GW';
+      return gw(c, u.c) + ' GW <span style="color:var(--muted)">(' + gw(saturationAt(k, u.hi, f), u.hi) + '–' + gw(saturationAt(k, u.lo, f), u.lo) + ')</span>';
+    };
+    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Prispåverkan</th><th>Första MW (k€/år)</th><th>Dygnsspread idag</th><th>75 % kvar</th><th>50 % kvar</th><th>25 % kvar</th></tr></thead><tbody>';
+    zones.forEach(function (k) {
+      var zz = DEPTH.zones[k], u = used[k];
+      html += '<tr><td><strong>' + k + '</strong></td><td>' + fmt(u.c, 1) + (u.sl ? ' <span style="color:var(--muted)">(' + fmt(u.lo, 1) + '–' + fmt(u.hi, 1) + ')</span>' : '') + '</td><td>' + fmt(zz.res[dur].rev[0]) + '</td><td>' + fmt(zz.spread0) + ' €</td><td>' + cell(k, 0.75) + '</td><td>' + cell(k, 0.5) + '</td><td>' + cell(k, 0.25) + '</td></tr>';
+    });
+    $('depth-table').innerHTML = html + '</tbody></table>';
+    $('note-depth-ref').textContent = 'Parentes visar 95 %-intervallet för prispåverkan, och därmed för mättnadspunkten. Som sammanhang: enligt Aurora Energy Research passerade Sverige 1 GW batterier i drift under första kvartalet 2025, med 2,8 GW som mål till 2028. Mycket av den kapaciteten säljer stödtjänster och inte arbitrage, och kapaciteten fördelas på flera elområden.';
+
+    renderSlopeEvidence(zones);
+  }
+
+  function renderSlopeEvidence(zones) {
+    var tbl = $('slope-table'), nt = $('note-slope');
+    if (!SLOPE) { tbl.innerHTML = ''; nt.textContent = 'Underlaget saknas ännu. Kör flödet igen efter att ha laddat upp den nya update_data.py.'; return; }
+    var fz = zones.filter(function (k) { return SLOPE.zones[k]; });
+    var f = function (o) { return o ? fmt(o.b, 1) + ' <span style="color:var(--muted)">(' + fmt(o.lo, 1) + '–' + fmt(o.hi, 1) + ')</span>' : '–'; };
+    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Skattad prispåverkan</th><th>Utan kontroll för DE</th><th>Med kontroll för DE</th><th>Observerad restlast (5–95 %)</th><th>Timmar</th></tr></thead><tbody>';
+    fz.forEach(function (k) {
+      var e = SLOPE.zones[k], c = e[e.central];
+      html += '<tr><td><strong>' + k + '</strong></td><td>' + f(c) + (c.lo <= 0 ? ' *' : '') + '</td><td>' + f(e.a) + '</td><td>' + (e.b ? f(e.b) : 'ingen (egen referens)') + '</td><td>' + fmt(e.rl_range[0], 1) + ' till +' + fmt(e.rl_range[1], 1) + ' GW</td><td>' + fmt(e.n) + '</td></tr>';
+    });
+    tbl.innerHTML = html + '</tbody></table>';
+    nt.textContent = 'Euro per MWh och GW, med 95 %-intervall i parentes. Skattningen är hur priset har rört sig vid variationer i restlast av den storlek som står längst till höger. Flottor större än så är en extrapolering. * Intervallet omfattar noll, så effekten går inte att skilja från noll i det här området.';
+
+    var binTr = [], dpTr = [];
+    fz.forEach(function (k) {
+      var e = SLOPE.zones[k], c = ZONE_COLORS[k] || '#888', b = e[e.central].b;
+      binTr.push({ type: 'scatter', mode: 'markers', name: k, legendgroup: k, x: e.bins.x, y: e.bins.y, marker: { color: c, size: 7 }, hovertemplate: '%{y:.1f} € vid %{x:.2f} GW' });
+      var xs = [e.bins.x[0], e.bins.x[e.bins.x.length - 1]];
+      binTr.push({ type: 'scatter', mode: 'lines', name: k + ' (lutning)', legendgroup: k, showlegend: false, x: xs, y: xs.map(function (x) { return b * x; }), line: { color: c, width: 1.8, dash: 'dot' }, hoverinfo: 'skip' });
+      var names = Object.keys(SLOPE.dayparts), vals = names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].b : null; });
+      dpTr.push({ type: 'bar', name: k, x: names.map(function (n) { return n.charAt(0).toUpperCase() + n.slice(1); }), y: vals, marker: { color: c },
+        error_y: { type: 'data', symmetric: false, thickness: 1.3, width: 3,
+                   array: names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].hi - e.dayparts[n].b : 0; }),
+                   arrayminus: names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].b - e.dayparts[n].lo : 0; }) },
+        hovertemplate: '%{y:.1f} €/MWh per GW' });
+    });
+    Plotly.react('chart-slope-bins', binTr, layout(['x'], { xaxis: { type: 'linear', ticksuffix: ' GW', gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--line'), fixedrange: true }, hovermode: 'closest', yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }) }), CONFIG);
+    Plotly.react('chart-slope-dayparts', dpTr, layout(['x'], { xaxis: { type: 'category', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true }, barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }) }), CONFIG);
+  }
+
   /* ---------- Flik: Pris och produktion ---------- */
   function renderRecent() {
     var r = RECENT.zones[state.zone];
@@ -905,7 +1137,7 @@
     if (!z) { state.zone = DATA.order[0]; z = DATA.zones[state.zone]; }
     renderZones();
     renderKpis(z);
-    var multi = state.tab === 'capture' || state.tab === 'duck' || state.tab === 'solar';
+    var multi = state.tab === 'capture' || state.tab === 'duck' || state.tab === 'solar' || state.tab === 'depth';
     ['zones', 'kpis', 'axis-note'].forEach(function (id) { $(id).hidden = multi; });
     $('zonebar').hidden = !multi;
     if (multi) renderZoneChips();
@@ -913,12 +1145,15 @@
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
     });
-    ['capture', 'duck', 'solar', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
+    ['capture', 'duck', 'solar', 'depth', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
 
     setPressed('seg-view', 'data-view', state.view);
     setPressed('seg-range', 'data-range', state.range);
     setPressed('seg-tech', 'data-tech', state.tech);
     setPressed('seg-solscn', 'data-scn', state.solScn);
+    setPressed('seg-depthdur', 'data-ddur', state.depthDur);
+    setPressed('seg-depthmax', 'data-dmax', state.depthMax);
+    setPressed('seg-depthmode', 'data-dmode', state.depthMode);
     setPressed('seg-base', 'data-base', state.showBase ? 'on' : 'off');
     setPressed('seg-range3', 'data-range', state.range);
     setPressed('seg-profile', 'data-profile', state.profile);
@@ -929,6 +1164,7 @@
     if (state.tab === 'capture') renderCapture();
     if (state.tab === 'duck') renderDuck();
     if (state.tab === 'solar') renderSolar();
+    if (state.tab === 'depth') renderDepth();
     if (state.tab === 'recent') renderRecent();
   }
 
@@ -973,6 +1209,25 @@
       var b = e.target.closest('button'); if (!b) return;
       state.dview = b.dataset.dview; renderAll();
     });
+    $('seg-depthdur').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.depthDur = b.dataset.ddur; renderAll();
+    });
+    $('seg-depthmax').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.depthMax = parseFloat(b.dataset.dmax); renderAll();
+    });
+    $('seg-depthmode').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.depthMode = b.dataset.dmode; renderAll();
+    });
+    $('seg-depthpre').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.depthS = parseFloat(b.dataset.dpre); state.depthMode = 'manual'; renderAll();
+    });
+    $('rng-depth').addEventListener('input', function (e) {
+      state.depthS = parseFloat(e.target.value) || 2; state.depthMode = 'manual'; renderAll();
+    });
     $('sel-solzone').addEventListener('change', function (e) { state.solZone = e.target.value; renderAll(); });
     $('sel-solmonth').addEventListener('change', function (e) { state.solMonth = e.target.value; renderAll(); });
     $('seg-solscn').addEventListener('click', function (e) {
@@ -998,9 +1253,11 @@
   Promise.all([
     fetch('data/summary.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('summary'); return r.json(); }),
     fetch('data/recent.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('recent'); return r.json(); }),
-    fetch('data/solar_bess.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    fetch('data/solar_bess.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+    fetch('data/depth.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+    fetch('data/slope.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
   ]).then(function (res) {
-    DATA = res[0]; RECENT = res[1]; SOLAR = res[2];
+    DATA = res[0]; RECENT = res[1]; SOLAR = res[2]; DEPTH = res[3]; SLOPE = res[4];
     var seen = {};
     DATA.order.forEach(function (k) {
       var zz = DATA.zones[k];
