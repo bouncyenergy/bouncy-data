@@ -393,12 +393,12 @@
       </div>
       <div class="slider-row">
         <label for="rng-depth">Prispåverkan</label>
-        <input type="range" id="rng-depth" min="0.5" max="10" step="0.5" value="2" aria-describedby="depth-help">
+        <input type="range" id="rng-depth" min="0.5" max="60" step="0.5" value="15" aria-describedby="depth-help">
         <output id="depth-s-label"></output>
         <div class="seg" role="group" aria-label="Förinställningar" id="seg-depthpre">
-          <button data-dpre="1">Djup</button>
-          <button data-dpre="3">Medel</button>
-          <button data-dpre="8">Grund</button>
+          <button data-dpre="5" id="pre-low">Lägst</button>
+          <button data-dpre="15" id="pre-mid">Median</button>
+          <button data-dpre="40" id="pre-high">Högst</button>
         </div>
       </div>
       <p class="note" id="depth-help"></p>
@@ -520,7 +520,7 @@
       <li id="n11"><strong>Capture price med batteri</strong> är intäkten delat med solparkens produktion, inklusive batteriförluster. Capture rate är capture price delat med områdets genomsnittspris under samma period. Beräkningen innehåller inte nätavgifter, balanskostnader, intradagshandel, stödtjänster, åldring eller investeringskostnader och ska ses som en illustration av prisvärdet i day-ahead-marknaden.</li>
       <li id="n12"><strong>Modellen för arbitragedjup.</strong> Flottan består av identiska batterier med effekt N och varaktighet 1, 2 eller 4 timmar, verkningsgrad 88 % tur och retur, och laddar bara från nätet. Batterierna är prisundertagare med full framförhållning på dygnets day-ahead-priser, och är tomma vid dygnets slut. Priset den timmen flyttas linjärt med flottans nettoflöde (prispåverkan i euro per MWh och GW). Genom att batterierna drar upp priset när de laddar och trycker ner det när de laddar ur sjunker intäkten per MW när flottan växer. Beräkningen bygger på timpriser för var fjärde dygn de senaste 12 månaderna, uppräknat till ett år.</li>
       <li id="n13"><strong>Begränsningar.</strong> Resultatet beror helt på prispåverkan. Modellen har en enda prisnivå per område och tar inte hänsyn till handel med grannområden som späder ut effekten, till att utbud och efterfrågan ändras över tid, eller till att batterier även säljer på intradag och stödtjänstmarknader. Den räknar inte med nätavgifter, drift, åldring eller investeringskostnader. Den visar en övre gräns för vad day-ahead-arbitrage ger, och inte vad en enskild anläggning kommer att tjäna.</li>
-      <li id="n14"><strong>Hur prispåverkan skattas.</strong> Per område görs en regression av timpris mot restlast (förbrukning minus vind och sol, i GW) de senaste 24 månaderna, med fasta effekter för månad (som fångar bränslepris och vattenläge) och för timme på dygnet uppdelat på vardag och helg. Priset begränsas till 1:a–99:e percentilen så att enstaka toppar inte styr. Standardfel är klusterrobusta per vecka. För alla områden utom Tyskland kontrolleras också för tyska restlasten, eftersom vädret samvarierar och områdena prissätts tillsammans. Skattningen utan den kontrollen visas också och blir ofta för hög.</li>
+      <li id="n14"><strong>Hur prispåverkan skattas.</strong> Per område görs en regression av timpris mot restlast (förbrukning minus vind och sol, i GW) de senaste 24 månaderna, med fasta effekter för månad (som fångar bränslepris och vattenläge) och för timme på dygnet uppdelat på vardag och helg. Priset begränsas till 1:a–99:e percentilen så att enstaka toppar inte styr. Standardfel är klusterrobusta per vecka. Eftersom vädret samvarierar mellan områden och områdena prissätts tillsammans körs fyra varianter: bara egen restlast, med Tyskland som kontroll, med alla andra områden som kontroll (huvudskattningen, inklusive de fem norska områdena) och samma sak på bara de senaste 12 månaderna. Banden i diagrammen spänner över de tre kontrollerade varianterna, och varianten utan kontroller visas bara som jämförelse eftersom den blir för hög.</li>
       <li id="n15"><strong>Vad skattningen inte visar.</strong> Den mäter hur priset har rört sig vid de variationer i restlast som faktiskt förekommit, ofta några hundra MW till någon GW i ett svenskt område. En batteriflotta på flera GW ligger utanför det intervallet, och då är linjen en extrapolering. När batterierna fyller upp överföringsförbindelserna till grannområden kopplas områdena loss och priset blir känsligare, så verklig mättnad kan komma snabbare än en rak linje antyder. Sambandet påverkas också av saker som inte ingår, till exempel flöden, kärnkraftsrevisioner och vattenläge.</li>
     </ol>
 
@@ -535,7 +535,7 @@
   'use strict';
 
   var MON = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-  var state = { zone: 'SE3', tab: 'capture', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', depthDur: '2h', depthS: 2, depthMax: 10, depthMode: 'est' };
+  var state = { zone: 'SE3', tab: 'capture', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', depthDur: '2h', depthS: 15, depthMax: 10, depthMode: 'est' };
   var DATA = null, RECENT = null;
 
   var qs = new URLSearchParams(location.search);
@@ -967,7 +967,7 @@
     for (var i = 1; i < xs.length; i++) {
       if (x <= xs[i]) { var t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]); return ys[i - 1] + t * (ys[i] - ys[i - 1]); }
     }
-    return ys[ys.length - 1];
+    return null;                                   // utanför det beräknade intervallet: rita inget
   }
   function depthCurve(zone, field, s, grid) {
     var r = DEPTH.zones[zone].res[state.depthDur][field];
@@ -990,7 +990,8 @@
     if (!e) return null;
     var c = e[e.central];
     if (!c) return null;
-    return { c: Math.max(c.b, 0.05), lo: Math.max(c.lo, 0.05), hi: Math.max(c.hi, 0.05), flat: c.lo <= 0.05, raw: c };
+    var band = e.band || { lo: c.lo, hi: c.hi };
+    return { c: Math.max(c.b, 0.05), lo: Math.max(Math.min(band.lo, c.lo), 0.05), hi: Math.max(band.hi, c.hi, 0.05), flat: band.lo <= 0.05, raw: c };
   }
   function rgba(hex, a) {
     var n = parseInt(hex.slice(1), 16);
@@ -1016,10 +1017,18 @@
     $('depth-s-label').textContent = est ? 'skattad per område' : fmt(s, 1) + ' €/MWh per GW';
     $('depth-help').textContent = est
       ? 'Prispåverkan är skattad per område från historisk last, vind, sol och pris (se Empiriskt underlag längre ned). Det skuggade bandet är 95 %-intervallet. Skattningen bygger på variationer i restlast av begränsad storlek, så stora flottor är en extrapolering.'
-      : 'Prispåverkan är hur många euro per megawattimme priset flyttar när en flotta på 1 GW laddar eller laddar ur med full effekt. Lågt värde är en djup marknad som tål många batterier, och högt värde en grund marknad som mättas fort. Kurvans form går att lita mer på än det exakta GW-talet.';
+      : 'Prispåverkan är hur många euro per megawattimme priset flyttar när en flotta på 1 GW laddar eller laddar ur med full effekt. Lågt värde är en djup marknad som tål många batterier, och högt värde en grund marknad som mättas fort. Förinställningarna är lägsta, mittersta och högsta skattade värdet bland områdena. Kurvans form går att lita mer på än det exakta GW-talet.';
     if (!SLOPE) $('depth-est-note').textContent = 'Skattningen saknas ännu (den kräver att förbrukning hämtas från ENTSO-E). Kör flödet igen, så visas den. Tills dess gäller reglaget.';
     else $('depth-est-note').textContent = '';
 
+    if (SLOPE) {
+      var cs = Object.keys(SLOPE.zones).map(function (k) { return SLOPE.zones[k][SLOPE.zones[k].central].b; }).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; });
+      if (cs.length) {
+        var med = cs.length % 2 ? cs[(cs.length - 1) / 2] : (cs[cs.length / 2 - 1] + cs[cs.length / 2]) / 2;
+        var setPre = function (id, v, t) { var b = $(id); b.dataset.dpre = String(Math.round(v * 2) / 2); b.textContent = t + ' (' + fmt(v, 1) + ')'; };
+        setPre('pre-low', cs[0], 'Lägst'); setPre('pre-mid', med, 'Median'); setPre('pre-high', cs[cs.length - 1], 'Högst');
+      }
+    }
     var grid = [];
     for (var i = 0; i <= 80; i++) grid.push(maxN * i / 80);
     var all = Object.keys(DEPTH.zones);
@@ -1072,13 +1081,13 @@
     if (!SLOPE) { tbl.innerHTML = ''; nt.textContent = 'Underlaget saknas ännu. Kör flödet igen efter att ha laddat upp den nya update_data.py.'; return; }
     var fz = zones.filter(function (k) { return SLOPE.zones[k]; });
     var f = function (o) { return o ? fmt(o.b, 1) + ' <span style="color:var(--muted)">(' + fmt(o.lo, 1) + '–' + fmt(o.hi, 1) + ')</span>' : '–'; };
-    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Skattad prispåverkan</th><th>Utan kontroll för DE</th><th>Med kontroll för DE</th><th>Observerad restlast (5–95 %)</th><th>Timmar</th></tr></thead><tbody>';
+    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Huvudskattning</th><th>Spann mellan modellvarianter</th><th>Bara egen restlast</th><th>Kontroll för Tyskland</th><th>Kontroll för alla områden</th><th>Observerad restlast (5–95 %)</th><th>Timmar</th></tr></thead><tbody>';
     fz.forEach(function (k) {
-      var e = SLOPE.zones[k], c = e[e.central];
-      html += '<tr><td><strong>' + k + '</strong></td><td>' + f(c) + (c.lo <= 0 ? ' *' : '') + '</td><td>' + f(e.a) + '</td><td>' + (e.b ? f(e.b) : 'ingen (egen referens)') + '</td><td>' + fmt(e.rl_range[0], 1) + ' till +' + fmt(e.rl_range[1], 1) + ' GW</td><td>' + fmt(e.n) + '</td></tr>';
+      var e = SLOPE.zones[k], c = e[e.central], bd = e.band || { lo: c.lo, hi: c.hi };
+      html += '<tr><td><strong>' + k + '</strong></td><td>' + f(c) + '</td><td>' + fmt(bd.lo, 1) + '–' + fmt(bd.hi, 1) + (bd.lo <= 0 ? ' *' : '') + '</td><td>' + f(e.a) + '</td><td>' + (e.b ? f(e.b) : 'egen referens') + '</td><td>' + (e.c ? f(e.c) : '–') + '</td><td>' + fmt(e.rl_range[0], 1) + ' till +' + fmt(e.rl_range[1], 1) + ' GW</td><td>' + fmt(e.n) + '</td></tr>';
     });
     tbl.innerHTML = html + '</tbody></table>';
-    nt.textContent = 'Euro per MWh och GW, med 95 %-intervall i parentes. Skattningen är hur priset har rört sig vid variationer i restlast av den storlek som står längst till höger. Flottor större än så är en extrapolering. * Intervallet omfattar noll, så effekten går inte att skilja från noll i det här området.';
+    nt.textContent = 'Euro per MWh och GW. Huvudskattningen kontrollerar för restlasten i alla andra områden som vi har data för (inklusive Norge). Spannet är det lägsta och högsta 95 %-intervallet bland de tre kontrollerade varianterna, och bara egen restlast blir ofta för hög. Skattningen gäller variationer av den storlek som står längst till höger, och större flottor är en extrapolering. * Spannet omfattar noll.';
 
     var binTr = [], dpTr = [];
     fz.forEach(function (k) {
@@ -1226,7 +1235,7 @@
       state.depthS = parseFloat(b.dataset.dpre); state.depthMode = 'manual'; renderAll();
     });
     $('rng-depth').addEventListener('input', function (e) {
-      state.depthS = parseFloat(e.target.value) || 2; state.depthMode = 'manual'; renderAll();
+      state.depthS = parseFloat(e.target.value) || 15; state.depthMode = 'manual'; renderAll();
     });
     $('sel-solzone').addEventListener('change', function (e) { state.solZone = e.target.value; renderAll(); });
     $('sel-solmonth').addEventListener('change', function (e) { state.solMonth = e.target.value; renderAll(); });
