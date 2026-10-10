@@ -58,6 +58,12 @@ ZONES = {
     "DK1": {"code": "DK_1", "name": "Danmark väst (DK1)"},
     "DK2": {"code": "DK_2", "name": "Danmark öst (DK2)"},
     "FI": {"code": "FI", "name": "Finland"},
+    # Kontrollområden: hämtas bara för vind, sol och förbrukning och används när prispåverkan skattas
+    "NO1": {"code": "NO_1", "name": "NO1 Oslo", "ctrl": True},
+    "NO2": {"code": "NO_2", "name": "NO2 Kristiansand", "ctrl": True},
+    "NO3": {"code": "NO_3", "name": "NO3 Trondheim", "ctrl": True},
+    "NO4": {"code": "NO_4", "name": "NO4 Tromsø", "ctrl": True},
+    "NO5": {"code": "NO_5", "name": "NO5 Bergen", "ctrl": True},
 }
 
 log = logging.getLogger("bouncy")
@@ -92,7 +98,8 @@ def pick_generation(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def fetch_zone(client, no_match_error, code: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame | None:
+def fetch_zone(client, no_match_error, code: str, start: pd.Timestamp, end: pd.Timestamp,
+               gen_only: bool = False) -> pd.DataFrame | None:
     """Hämtar pris + produktion för ett område och returnerar timdata (UTC)."""
 
     def attempt(fn):
@@ -109,8 +116,10 @@ def fetch_zone(client, no_match_error, code: str, start: pd.Timestamp, end: pd.T
 
     parts = []
     for s, e in month_chunks(start, end):
-        price = attempt(lambda: client.query_day_ahead_prices(code, start=s, end=e))
-        time.sleep(0.3)
+        price = None
+        if not gen_only:
+            price = attempt(lambda: client.query_day_ahead_prices(code, start=s, end=e))
+            time.sleep(0.3)
         gen = attempt(lambda: client.query_generation(code, start=s, end=e))
         time.sleep(0.3)
 
@@ -198,7 +207,8 @@ def save_cache(key: str, df: pd.DataFrame) -> None:
     df.round(3).to_csv(RAW_DIR / f"{key}.csv.gz", compression="gzip")
 
 
-def update_cache(client, no_match_error, key: str, code: str, start_default: str) -> pd.DataFrame | None:
+def update_cache(client, no_match_error, key: str, code: str, start_default: str,
+                 gen_only: bool = False) -> pd.DataFrame | None:
     cached = load_cache(key)
     now_local = pd.Timestamp.now(tz=TZ)
     end = now_local.normalize() + pd.Timedelta(days=2)   # day-ahead för i morgon finns efter ca 13:00
@@ -208,7 +218,7 @@ def update_cache(client, no_match_error, key: str, code: str, start_default: str
     else:
         start = pd.Timestamp(start_default, tz=TZ)
     log.info("%s: hämtar %s → %s", key, start.date(), end.date())
-    new = fetch_zone(client, no_match_error, code, start, end)
+    new = fetch_zone(client, no_match_error, code, start, end, gen_only)
     if new is None:
         log.warning("%s: ingen ny data", key)
         merged = cached
@@ -566,65 +576,95 @@ def _fit(y: np.ndarray, xs: list, z: np.ndarray, g: np.ndarray):
     return float(b[0]), float(b[0] - 1.96 * se[0]), float(b[0] + 1.96 * se[0]), r[:, 0], r[:, 1]
 
 
-def estimate_slopes(frames: dict, names: dict, months_back: int = SLOPE_MONTHS) -> dict:
-    out = {}
-    ref = frames.get(REFERENCE_ZONE)
+def _ols_row(f) -> dict:
+    return {"b": round(f[0], 3), "lo": round(f[1], 3), "hi": round(f[2], 3)}
+
+
+def estimate_slopes(frames: dict, names: dict, targets: list, months_back: int = SLOPE_MONTHS) -> dict:
+    """
+    Fyra modellvarianter per område (alla med fasta effekter för månad och klockslag/vardag/helg):
+      a  bara områdets egen restlast
+      b  + Tysklands restlast
+      c  + restlast i alla andra områden vi har data för (inklusive Norge)   <- huvudskattning
+      d  som c men bara de senaste 12 månaderna
+    Banden i dashboarden spänner över b, c och d.
+    """
+    rl_all = {}
     for key, df in frames.items():
-        if "load" not in df or df["load"].notna().sum() < 24 * 120:
+        if "load" in df and df["load"].notna().sum() >= 24 * 120:
+            rl_all[key] = _rl_gw(df[["load", "wind", "solar"]])
+    rl_all = pd.DataFrame(rl_all)
+    out = {}
+    for key in targets:
+        df = frames.get(key)
+        if df is None or key not in rl_all or "price" not in df:
             continue
-        d = df[["price", "load", "wind", "solar"]].copy()
+        d = pd.DataFrame({"price": df["price"], "rl": rl_all[key]})
         d = d[d.index >= d.index.max() - pd.DateOffset(months=months_back)]
-        d["rl"] = _rl_gw(d)
-        d["rl_ref"] = np.nan
-        if ref is not None and key != REFERENCE_ZONE and "load" in ref:
-            rr = ref[["price", "load", "wind", "solar"]]
-            d["rl_ref"] = _rl_gw(rr).reindex(d.index)
         d = d[d["price"].notna() & d["rl"].notna()]
         if len(d) < 24 * 120:
             continue
-        lo_p, hi_p = np.percentile(d["price"], [1, 99])
-        y = d["price"].clip(lo_p, hi_p).to_numpy(dtype=float)
-        idx_local = d.index.tz_convert(TZ)
-        z = _fe_matrix(idx_local)
-        week = (idx_local.normalize().tz_localize(None).to_numpy().astype("datetime64[D]").astype(np.int64) // 7)
-        x_own = d["rl"].to_numpy(dtype=float)
+        others = rl_all.drop(columns=[key]).reindex(d.index)
+        others = others.loc[:, others.notna().mean() >= 0.7]
+        others = others.interpolate(limit=6, limit_area="inside")
+        ref_ok = REFERENCE_ZONE in others and key != REFERENCE_ZONE
 
-        a = _fit(y, [x_own], z, week)
-        res = {"name": names.get(key, key), "n": int(len(d)),
-               "a": {"b": round(a[0], 3), "lo": round(a[1], 3), "hi": round(a[2], 3)}, "b": None, "central": "a"}
-        central = a
-        has_ref = d["rl_ref"].notna().mean() > 0.9
-        if has_ref:
-            keep = d["rl_ref"].notna().to_numpy()
-            b2 = _fit(y[keep], [x_own[keep], d["rl_ref"].to_numpy(dtype=float)[keep]], z[keep], week[keep])
-            res["b"] = {"b": round(b2[0], 3), "lo": round(b2[1], 3), "hi": round(b2[2], 3)}
-            res["central"] = "b"
-            central = b2
-        # per tid på dygnet, samma specifikation som centralvärdet
+        lo_p, hi_p = np.percentile(d["price"], [1, 99])
+        y_all = d["price"].clip(lo_p, hi_p).to_numpy(dtype=float)
+        idx_local = d.index.tz_convert(TZ)
+        z_all = _fe_matrix(idx_local)
+        week_all = (idx_local.normalize().tz_localize(None).to_numpy().astype("datetime64[D]").astype(np.int64) // 7)
+        x_own = d["rl"].to_numpy(dtype=float)
         hours = idx_local.hour.to_numpy()
+        recent = (d.index >= d.index.max() - pd.DateOffset(months=12))
+
+        def run(cols, mask=None):
+            ok = np.ones(len(d), dtype=bool) if mask is None else mask.copy()
+            xs = [x_own]
+            for c in cols:
+                v = others[c].to_numpy(dtype=float)
+                ok &= ~np.isnan(v)
+                xs.append(v)
+            if ok.sum() < 24 * 60:
+                return None
+            return _fit(y_all[ok], [x[ok] for x in xs], z_all[ok], week_all[ok]), ok
+
+        res = {"name": names.get(key, key), "n": int(len(d)), "central": "a", "b": None, "c": None, "d": None}
+        fa = run([])
+        res["a"] = _ols_row(fa[0])
+        central = fa
+        fb = run([REFERENCE_ZONE]) if ref_ok else None
+        if fb:
+            res["b"], res["central"], central = _ols_row(fb[0]), "b", fb
+        ctrl_cols = list(others.columns)
+        fc = run(ctrl_cols) if ctrl_cols else None
+        if fc:
+            res["c"], res["central"], central = _ols_row(fc[0]), "c", fc
+            res["controls"] = ctrl_cols
+            fd = run(ctrl_cols, recent)
+            if fd:
+                res["d"] = _ols_row(fd[0])
+        used = [res[k] for k in ("b", "c", "d") if res[k]] or [res["a"]]
+        res["band"] = {"lo": round(min(u["lo"] for u in used), 3), "hi": round(max(u["hi"] for u in used), 3)}
+
+        # per tid på dygnet, samma specifikation som huvudskattningen
+        cols_c = ctrl_cols if res["central"] == "c" else ([REFERENCE_ZONE] if res["central"] == "b" else [])
         res["dayparts"] = {}
         for name, hrs in DAYPARTS.items():
-            m = np.isin(hours, hrs)
-            if has_ref:
-                m = m & d["rl_ref"].notna().to_numpy()
-                xs = [x_own[m], d["rl_ref"].to_numpy(dtype=float)[m]]
-            else:
-                xs = [x_own[m]]
-            if m.sum() < 24 * 60:
-                continue
-            f = _fit(y[m], xs, z[m], week[m])
-            res["dayparts"][name] = {"b": round(f[0], 3), "lo": round(f[1], 3), "hi": round(f[2], 3), "n": int(m.sum())}
-        # binnat spridningsdiagram av renade värden (visar om sambandet är linjärt)
-        xr, yr = central[4], central[3]
+            f = run(cols_c, np.isin(hours, hrs))
+            if f:
+                res["dayparts"][name] = {**_ols_row(f[0]), "n": int(f[1].sum())}
+        # binnat spridningsdiagram av renade värden
+        xr, yr = central[0][4], central[0][3]
         edges = np.quantile(xr, np.linspace(0, 1, 21))
         bin_id = np.clip(np.searchsorted(edges, xr, side="right") - 1, 0, 19)
         res["bins"] = {"x": [round(float(xr[bin_id == i].mean()), 3) for i in range(20)],
                        "y": [round(float(yr[bin_id == i].mean()), 2) for i in range(20)]}
         res["rl_range"] = [round(float(np.percentile(xr, 5)), 2), round(float(np.percentile(xr, 95)), 2)]
-        res["rl_mean"] = round(float(d["rl"].mean()), 2)
         out[key] = res
         c = res[res["central"]]
-        log.info("%s: prispåverkan %.2f €/MWh per GW (95 %%: %.2f–%.2f), n=%d", key, c["b"], c["lo"], c["hi"], len(d))
+        log.info("%s: prispåverkan %.1f €/MWh per GW (huvudskattning %s; spann %.1f–%.1f), n=%d", key, c["b"], res["central"],
+                 res["band"]["lo"], res["band"]["hi"], len(d))
     return out
 
 
@@ -635,7 +675,7 @@ def estimate_slopes(frames: dict, names: dict, months_back: int = SLOPE_MONTHS) 
 # flyttas priset med kappa * x  (kappa = prispåverkan per GW * flottans storlek i GW).
 # Intäkten per MW beror bara på kappa, så ett svep över kappa räcker för alla flottstorlekar och alla
 # prispåverkansvärden. Dashboarden gör resten (kappa = s * N).
-DEPTH_KAPPA = [0, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192]
+DEPTH_KAPPA = [0, 0.5, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384]
 DEPTH_BREAKS = np.array([0, 0.01, 0.025, 0.05, 0.1, 0.18, 0.3, 0.5, 0.75, 1.0])   # glesare vid hög effekt
 DEPTH_DAY_STEP = 4                 # var fjärde dygn räcker för ett årsmedel
 DEPTH_HOURS = [1, 2, 4]
@@ -734,22 +774,26 @@ def demo_frame(key: str, seed: int) -> pd.DataFrame:
     cloud = np.clip(0.75 + 0.2 * rng.normal(size=n) * 0.5, 0.2, 1.0)
     solar_cf = sun * (0.45 + 0.4 * (-winter)) * cloud
 
-    level = {"SE1": 0.45, "SE2": 0.5, "SE3": 0.85, "SE4": 1.0, "DE": 1.5, "DK1": 1.3, "DK2": 1.3, "FI": 0.75}[key]
+    level = {"SE1": 0.45, "SE2": 0.5, "SE3": 0.85, "SE4": 1.0, "DE": 1.5, "DK1": 1.3, "DK2": 1.3, "FI": 0.75}.get(key, 0.8)
     shape = 10 * np.exp(-((hour - 8) ** 2) / 8) + 16 * np.exp(-((hour - 19) ** 2) / 6) - 6 * np.exp(-((hour - 3) ** 2) / 10)
     price = (58 + 24 * winter + shape) * level - 70 * (wind_cf - 0.33) * (0.5 + level / 2)
     price -= 22 * level * solar_cf
     price += rng.normal(scale=6, size=n) + np.where(rng.random(n) < 0.004, rng.normal(120, 60, size=n), 0)
     price = np.maximum(price, -40)
 
-    wind_mw = {"SE1": 900, "SE2": 2300, "SE3": 2000, "SE4": 1500, "DE": 55000, "DK1": 4500, "DK2": 1800, "FI": 6500}[key] * wind_cf
+    wind_mw = {"SE1": 900, "SE2": 2300, "SE3": 2000, "SE4": 1500, "DE": 55000, "DK1": 4500, "DK2": 1800, "FI": 6500}.get(key, 700) * wind_cf
     solar_mw = {"SE3": 700, "SE4": 600, "DE": 70000, "DK1": 2800, "DK2": 1500, "FI": 900}.get(key)
     solar = solar_mw * solar_cf if solar_mw else np.full(n, np.nan)   # SE1/SE2 saknar solrapportering
-    load_mean = {"SE1": 1900, "SE2": 2400, "SE3": 9500, "SE4": 3400, "DE": 55000, "DK1": 3200, "DK2": 1700, "FI": 9500}.get(key, 3000)
+    load_mean = {"SE1": 1900, "SE2": 2400, "SE3": 9500, "SE4": 3400, "DE": 55000, "DK1": 3200, "DK2": 1700, "FI": 9500, "NO1": 4500, "NO2": 4000, "NO3": 2500, "NO4": 1700, "NO5": 3000}.get(key, 3000)
     load = load_mean * (1 + 0.12 * winter + 0.08 * np.sin((hour - 6) / 24 * 2 * np.pi) + 0.02 * rng.normal(size=n))
     rl = (load - wind_mw - np.nan_to_num(solar)) / 1000
     s_demo = {"SE1": 1.0, "SE2": 1.2, "SE3": 2.0, "SE4": 2.8, "DE": 1.6, "DK1": 2.2, "DK2": 2.4, "FI": 1.8}.get(key, 2.0)
     price = price + s_demo * (rl - rl.mean())
-    return pd.DataFrame({"price": price, "wind": wind_mw, "solar": solar, "load": load}, index=idx)
+    df = pd.DataFrame({"price": price, "wind": wind_mw, "solar": solar, "load": load}, index=idx)
+    if ZONES[key].get("ctrl"):
+        df["price"] = np.nan
+        df["solar"] = np.nan
+    return df
 
 
 # --------------------------------------------------------------------------- #
@@ -790,11 +834,18 @@ def main() -> int:
         elif args.no_fetch:
             df = load_cache(key)
         else:
-            df = update_cache(client, no_match, key, info["code"], args.start)
+            ctrl = info.get("ctrl", False)
+            start_key = args.start
+            if ctrl:                     # kontrollområden behöver bara de senaste ca två åren
+                limit = (pd.Timestamp.now(tz=TZ).normalize() - pd.DateOffset(months=SLOPE_MONTHS + 1)).strftime("%Y-%m-%d")
+                start_key = max(args.start, limit)
+            df = update_cache(client, no_match, key, info["code"], start_key, gen_only=ctrl)
         if df is None or df.empty:
             log.warning("%s: ingen data, hoppar över", key)
             continue
         frames[key] = df
+        if info.get("ctrl"):
+            continue                     # inga egna flikar för kontrollområden
         result = compute_zone(df, include_partial=args.include_partial)
         if result is None:
             log.warning("%s: för lite data för att räkna", key)
@@ -841,7 +892,7 @@ def main() -> int:
 
     # ---- prispåverkan (skattas ur last, vind, sol och pris) ----------------- #
     try:
-        slopes = estimate_slopes(frames, {k: ZONES[k]["name"] for k in frames})
+        slopes = estimate_slopes(frames, {k: ZONES[k]["name"] for k in frames}, list(summary_zones))
         if slopes:
             (OUT_DIR / "slope.json").write_text(
                 json.dumps({"generated": stamp, "demo": bool(args.demo), "months": SLOPE_MONTHS, "reference": REFERENCE_ZONE,
