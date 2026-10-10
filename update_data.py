@@ -9,6 +9,7 @@ sparar en lokal cache (data/raw/*.csv.gz) och räknar ut:
   * rullande 12 månader (produktionsviktat)
   * dygnsspread per månad (medel och max)
   * medelpris per timme på dygnet och månad (duck curve, dag- och nattpriser)
+  * fiktiv solpark i Halmstad (PVGIS) med och utan batteri: capture price och capture rate
   * timmar med negativt pris
   * timvyer för de senaste 14 dagarna
 
@@ -272,6 +273,178 @@ def lst(series, nd: int = 2) -> list:
 
 
 # --------------------------------------------------------------------------- #
+# Fiktiv solpark med batteri (BESS)
+# --------------------------------------------------------------------------- #
+PV = {"lat": 56.674, "lon": 12.857, "tilt": 30, "aspect": 0, "loss": 14, "year": 2019}   # aspect 0 = söder i PVGIS
+PVGIS_URLS = [
+    "https://re.jrc.ec.europa.eu/api/v5_3/seriescalc",
+    "https://re.jrc.ec.europa.eu/api/v5_2/seriescalc",
+    "https://re.jrc.ec.europa.eu/api/seriescalc",
+]
+BESS_HOURS = [1, 2, 4]            # batteriets varaktighet vid full effekt
+BESS_POWER_PER_MWP = 1.0          # MW batterieffekt per MWp solpark
+BESS_RTE = 0.88                   # verkningsgrad tur och retur (laddning + urladdning)
+SCENARIOS = ["none"] + [f"{h}h" for h in BESS_HOURS]
+
+
+def profile_array(prof: pd.DataFrame) -> np.ndarray:
+    """Gör om (månad, dag, timme, cf) till en 12x31x24-tabell med kapacitetsfaktor (MW per MWp), UTC."""
+    arr = np.full((12, 31, 24), np.nan)
+    arr[prof["month"].to_numpy() - 1, prof["day"].to_numpy() - 1, prof["hour"].to_numpy()] = prof["cf"].to_numpy()
+    arr[1, 28, :] = np.where(np.isnan(arr[1, 28, :]), arr[1, 27, :], arr[1, 28, :])      # 29 februari saknas i vanliga år
+    return arr
+
+
+def fetch_pv_profile(allow_network: bool = True) -> np.ndarray | None:
+    """Timprofil för 1 MWp i Halmstad (lutning 30°, söder) från PVGIS, cachad i data/raw."""
+    path = RAW_DIR / f"pvgis_{PV['year']}_t{PV['tilt']}_a{PV['aspect']}_l{PV['loss']}.csv.gz"
+    if path.exists():
+        return profile_array(pd.read_csv(path))
+    if not allow_network:
+        return None
+    import requests
+    params = {"lat": PV["lat"], "lon": PV["lon"], "peakpower": 1, "loss": PV["loss"], "angle": PV["tilt"],
+              "aspect": PV["aspect"], "startyear": PV["year"], "endyear": PV["year"], "pvcalculation": 1,
+              "outputformat": "json", "usehorizon": 1, "mountingplace": "free", "pvtechchoice": "crystSi"}
+    data = None
+    for url in PVGIS_URLS:
+        try:
+            r = requests.get(url, params=params, timeout=180)
+            r.raise_for_status()
+            data = r.json()
+            break
+        except Exception as exc:
+            log.warning("PVGIS (%s) misslyckades: %s", url.split("/api/")[1], exc)
+    if data is None:
+        return None
+    rows = data["outputs"]["hourly"]
+    t = pd.to_datetime([r["time"] for r in rows], format="%Y%m%d:%H%M")
+    prof = pd.DataFrame({"month": t.month, "day": t.day, "hour": t.hour, "cf": [r["P"] / 1000.0 for r in rows]})
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    prof.to_csv(path, index=False, compression="gzip")
+    log.info("PVGIS: hämtade %d timmar för %s (år %d)", len(prof), "Halmstad", PV["year"])
+    return profile_array(prof)
+
+
+def demo_pv_array() -> np.ndarray:
+    """Syntetisk profil (bara för förhandsvisning utan nätverk)."""
+    rng = np.random.default_rng(3)
+    arr = np.zeros((12, 31, 24))
+    for m in range(12):
+        for d in range(31):
+            doy = m * 30.4 + d
+            seas = np.cos(2 * np.pi * (doy - 172) / 365)          # 1 vid midsommar
+            day_len = 12 + 5.5 * seas
+            peak = 0.14 + 0.52 * (seas + 1) / 2
+            cloud = np.clip(rng.beta(2.2, 1.3), 0.12, 1.0)
+            for h in range(24):
+                x = (h + 0.5 - 11.0) / (day_len / 2)               # UTC ≈ lokal tid minus 1–2 h
+                arr[m, d, h] = max(0.0, peak * cloud * np.cos(np.clip(x, -1, 1) * np.pi / 2) ** 1.3) if abs(x) < 1 else 0.0
+    arr[1, 28, :] = arr[1, 27, :]
+    return arr
+
+
+def optimise_day(p: np.ndarray, g: np.ndarray, energy: float, power: float, rte: float):
+    """
+    Bästa laddning (c) och urladdning (d) för ett dygn, i MWh per timme.
+    Batteriet laddas bara från solparken (ingen nätladdning) och måste vara tomt vid dygnets slut.
+    Intäkten är summan av pris * (produktion - c + d).  Lösningen är exakt (linjärprogram).
+    """
+    from scipy.optimize import linprog
+    n = len(p)
+    eta = rte ** 0.5
+    L = np.tril(np.ones((n, n)))
+    cost = np.concatenate([p, -p])
+    A_ub = np.block([[eta * L, -L / eta], [-eta * L, L / eta]])
+    b_ub = np.concatenate([np.full(n, energy), np.zeros(n)])
+    A_eq = np.concatenate([np.full(n, eta), np.full(n, -1.0 / eta)])[None, :]
+    bounds = [(0.0, float(min(power, gi))) for gi in g] + [(0.0, power)] * n
+    res = linprog(cost, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=[0.0], bounds=bounds, method="highs")
+    if res.status != 0:
+        return np.zeros(n), np.zeros(n)
+    return np.clip(res.x[:n], 0, None), np.clip(res.x[n:], 0, None)
+
+
+def compute_solar_bess(prices: dict, cf_arr: np.ndarray, window: list[str], names: dict) -> dict:
+    """Capture price/rate för en solpark (1 MWp) utan och med 1, 2 och 4 timmars batteri, per elområde."""
+    power = BESS_POWER_PER_MWP
+    result = {}
+    for key, price in prices.items():
+        s = price.dropna()
+        if s.empty:
+            continue
+        loc_idx = s.index.tz_convert(TZ)
+        month = np.asarray(loc_idx.strftime("%Y-%m"))
+        sel = np.isin(month, window)
+        if sel.sum() < 24 * 200:
+            continue
+        s, loc_idx, month = s[sel], loc_idx[sel], month[sel]
+        p_all = s.to_numpy(dtype=float)
+        g_all = np.nan_to_num(cf_arr[s.index.month - 1, s.index.day - 1, s.index.hour])
+        date = np.asarray(loc_idx.strftime("%Y-%m-%d"))
+        days = pd.Series(np.arange(len(s))).groupby(date).indices
+
+        acc = {m: {sc: np.zeros(4) for sc in SCENARIOS} for m in window}        # intäkt, produktion, laddat, urladdat
+        base = {m: np.zeros(2) for m in window}                                  # summa pris, antal timmar
+        cands = {m: [] for m in window}                                          # kandidater till exempeldag
+        for d, idx in days.items():
+            n = len(idx)
+            if n < 23:
+                continue
+            p, g, m = p_all[idx], g_all[idx], month[idx[0]]
+            base[m] += (p.sum(), n)
+            rev0 = float((p * g).sum())
+            acc[m]["none"] += (rev0, g.sum(), 0.0, 0.0)
+            if n == 24 and g.sum() > 0:
+                cands[m].append((float(g.sum()), d))
+            for hrs in BESS_HOURS:
+                if g.sum() < 1e-6 or p.max() - p.min() < 1e-6:
+                    acc[m][f"{hrs}h"] += (rev0, g.sum(), 0.0, 0.0)
+                    continue
+                c, dch = optimise_day(p, g, hrs * power, power, BESS_RTE)
+                acc[m][f"{hrs}h"] += (float((p * (g - c + dch)).sum()), g.sum(), c.sum(), dch.sum())
+
+        def cp_cr(a, b):
+            return (a[0] / a[1], (a[0] / a[1]) / (b[0] / b[1])) if a[1] > 0 and b[1] > 0 else (None, None)
+
+        tot_base = sum(base.values(), np.zeros(2))
+        total, monthly = {}, {"months": window, "base": [None if base[m][1] == 0 else round(base[m][0] / base[m][1], 2) for m in window]}
+        for sc in SCENARIOS:
+            a = sum((acc[m][sc] for m in window), np.zeros(4))
+            cp, cr = cp_cr(a, tot_base)
+            entry = {"cp": None if cp is None else round(cp, 2), "cr": None if cr is None else round(cr, 4)}
+            if sc != "none" and a[1] > 0:
+                hrs = int(sc[:-1])
+                entry["share"] = round(a[2] / a[1], 4)                       # andel av produktionen som går via batteriet
+                entry["cycles"] = round(a[3] / (hrs * power), 1)             # fulla cykler under perioden
+            total[sc] = entry
+            vals = [cp_cr(acc[m][sc], base[m]) for m in window]
+            monthly[sc] = {"cp": [None if v[0] is None else round(v[0], 2) for v in vals],
+                           "cr": [None if v[1] is None else round(v[1], 4) for v in vals]}
+
+        # exempeldag: dagen med medianproduktion i varje månad
+        examples = []
+        for m in window:
+            if not cands[m]:
+                continue
+            ordered = sorted(cands[m])
+            d = ordered[len(ordered) // 2][1]
+            idx = days[d]
+            p, g = p_all[idx], g_all[idx]
+            ex = {"month": m, "date": d, "p": [round(float(v), 2) for v in p], "pv": [round(float(v), 3) for v in g]}
+            for hrs in BESS_HOURS:
+                c, dch = optimise_day(p, g, hrs * power, power, BESS_RTE)
+                ex[f"{hrs}h"] = [round(float(v), 3) for v in (g - c + dch)]
+            examples.append(ex)
+
+        result[key] = {"name": names.get(key, key), "base": round(float(tot_base[0] / tot_base[1]), 2),
+                       "yield": round(float(sum(acc[m]["none"][1] for m in window)), 0),
+                       "total": total, "monthly": monthly, "examples": examples}
+        log.info("%s: solpark + BESS klar (%d dygn)", key, len(days))
+    return result
+
+
+# --------------------------------------------------------------------------- #
 # Demodata (för att förhandsgranska dashboarden utan token)
 # --------------------------------------------------------------------------- #
 def demo_frame(key: str, seed: int) -> pd.DataFrame:
@@ -337,7 +510,7 @@ def main() -> int:
         from entsoe.exceptions import NoMatchingDataError
         client, no_match = EntsoePandasClient(api_key=token), NoMatchingDataError
 
-    summary_zones, recent_zones = {}, {}
+    summary_zones, recent_zones, frames = {}, {}, {}
     for i, key in enumerate(keys):
         info = ZONES[key]
         if args.demo:
@@ -349,6 +522,7 @@ def main() -> int:
         if df is None or df.empty:
             log.warning("%s: ingen data, hoppar över", key)
             continue
+        frames[key] = df
         result = compute_zone(df, include_partial=args.include_partial)
         if result is None:
             log.warning("%s: för lite data för att räkna", key)
@@ -372,6 +546,23 @@ def main() -> int:
     (OUT_DIR / "recent.json").write_text(
         json.dumps({"generated": stamp, "zones": recent_zones}, ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8")
+
+    # ---- fiktiv solpark med batteri -------------------------------------- #
+    try:
+        cf_arr = demo_pv_array() if args.demo else fetch_pv_profile(allow_network=not args.no_fetch)
+        if cf_arr is None:
+            log.warning("Solpark + BESS hoppades över (ingen PVGIS-profil).")
+        else:
+            months_all = sorted({m for z in summary_zones.values() for m in z["months"]})
+            res = compute_solar_bess({k: frames[k]["price"] for k in summary_zones}, cf_arr, months_all[-12:],
+                                     {k: ZONES[k]["name"] for k in summary_zones})
+            site = {"name": "Halmstad", **PV, "bess_hours": BESS_HOURS, "bess_power_mw_per_mwp": BESS_POWER_PER_MWP,
+                    "rte": BESS_RTE, "window": months_all[-12:]}
+            (OUT_DIR / "solar_bess.json").write_text(
+                json.dumps({"generated": stamp, "demo": bool(args.demo), "site": site, "zones": res},
+                           ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    except Exception as exc:                       # felet ska aldrig stoppa resten av uppdateringen
+        log.warning("Solpark + BESS hoppades över: %s", exc)
     log.info("Klart: %d områden skrivna till %s", len(summary_zones), OUT_DIR)
     return 0
 
