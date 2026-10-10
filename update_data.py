@@ -8,6 +8,7 @@ sparar en lokal cache (data/raw/*.csv.gz) och räknar ut:
   * capture price / capture rate per månad och teknik (vind, sol)
   * rullande 12 månader (produktionsviktat)
   * dygnsspread per månad (medel och max)
+  * medelpris per timme på dygnet och månad (duck curve, dag- och nattpriser)
   * timmar med negativt pris
   * timvyer för de senaste 14 dagarna
 
@@ -234,7 +235,12 @@ def compute_zone(df: pd.DataFrame, include_partial: bool = False) -> tuple[dict,
         spread_max=("spread", "max"),
         mm_mean=("mm", "mean"),
         mm_max=("mm", "max"),
+        days=("spread", "size"),
     ).reindex(months)
+
+    # ---- timprofil per månad (för duck curve, dag- och nattpriser) ------ #
+    hp = (loc.groupby([loc.index.to_period("M").astype(str), loc.index.hour])["price"]
+             .mean().unstack().reindex(index=months, columns=range(24)))
 
     zone_out = {
         "months": months,
@@ -243,7 +249,10 @@ def compute_zone(df: pd.DataFrame, include_partial: bool = False) -> tuple[dict,
         "neg_hours": [None if pd.isna(v) else int(v) for v in mdf["neg_hours"]],
         "wind": tech_out["wind"],
         "solar": tech_out["solar"],
-        "spread": {c: lst(sp[c]) for c in sp.columns},
+        "spread": {c: lst(sp[c]) for c in sp.columns if c != "days"},
+        "spread_days": [None if pd.isna(v) else int(v) for v in sp["days"]],
+        "n": [None if pd.isna(v) else int(v) for v in mdf["n"]],
+        "hp": [[None if pd.isna(v) else round(float(v), 1) for v in row] for row in hp.to_numpy()],
     }
 
     # ---- senaste dygnen i timupplösning ---------------------------------- #
