@@ -9,6 +9,7 @@ sparar en lokal cache (data/raw/*.csv.gz) och räknar ut:
   * rullande 12 månader (produktionsviktat)
   * dygnsspread per månad (medel och max)
   * medelpris per timme på dygnet och månad (duck curve, dag- och nattpriser)
+  * prissamband: andel timmar med exakt samma pris som andra elområden
   * timmar med negativt pris
   * timvyer för de senaste 14 dagarna
 
@@ -54,7 +55,18 @@ ZONES = {
     "DK1": {"code": "DK_1", "name": "Danmark väst (DK1)"},
     "DK2": {"code": "DK_2", "name": "Danmark öst (DK2)"},
     "FI": {"code": "FI", "name": "Finland"},
+    # Referensområden: hämtas bara med pris och används i fliken Prissamband
+    "NO1": {"code": "NO_1", "name": "NO1 Oslo", "ref": True},
+    "NO2": {"code": "NO_2", "name": "NO2 Kristiansand", "ref": True},
+    "NO3": {"code": "NO_3", "name": "NO3 Trondheim", "ref": True},
+    "NO4": {"code": "NO_4", "name": "NO4 Tromsø", "ref": True},
+    "NO5": {"code": "NO_5", "name": "NO5 Bergen", "ref": True},
+    "PL": {"code": "PL", "name": "Polen (PL)", "ref": True},
+    "LT": {"code": "LT", "name": "Litauen (LT)", "ref": True},
 }
+
+SEASONS = {"win": (12, 1, 2), "spr": (3, 4, 5), "sum": (6, 7, 8), "aut": (9, 10, 11)}
+EQUAL_TOL = 0.01                 # EUR/MWh: lika pris = skillnad under en cent
 
 log = logging.getLogger("bouncy")
 
@@ -62,11 +74,11 @@ log = logging.getLogger("bouncy")
 # --------------------------------------------------------------------------- #
 # Hämtning från ENTSO-E
 # --------------------------------------------------------------------------- #
-def month_chunks(start: pd.Timestamp, end: pd.Timestamp):
-    """Delar upp [start, end) i kalendermånader (ENTSO-E vill ha rimliga intervall)."""
+def month_chunks(start: pd.Timestamp, end: pd.Timestamp, step: int = 1):
+    """Delar upp [start, end) i block om `step` kalendermånader (ENTSO-E tillåter max ett år per anrop)."""
     cur = start
     while cur < end:
-        nxt = min(cur + pd.offsets.MonthBegin(1), end)
+        nxt = min(cur + pd.offsets.MonthBegin(step), end)
         yield cur, nxt
         cur = nxt
 
@@ -88,7 +100,8 @@ def pick_generation(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def fetch_zone(client, no_match_error, code: str, start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame | None:
+def fetch_zone(client, no_match_error, code: str, start: pd.Timestamp, end: pd.Timestamp,
+               price_only: bool = False) -> pd.DataFrame | None:
     """Hämtar pris + produktion för ett område och returnerar timdata (UTC)."""
 
     def attempt(fn):
@@ -104,11 +117,13 @@ def fetch_zone(client, no_match_error, code: str, start: pd.Timestamp, end: pd.T
         return None
 
     parts = []
-    for s, e in month_chunks(start, end):
+    for s, e in month_chunks(start, end, 3 if price_only else 1):
         price = attempt(lambda: client.query_day_ahead_prices(code, start=s, end=e))
         time.sleep(0.3)
-        gen = attempt(lambda: client.query_generation(code, start=s, end=e))
-        time.sleep(0.3)
+        gen = None
+        if not price_only:
+            gen = attempt(lambda: client.query_generation(code, start=s, end=e))
+            time.sleep(0.3)
 
         frame = pd.DataFrame()
         if price is not None and len(price):
@@ -145,7 +160,8 @@ def save_cache(key: str, df: pd.DataFrame) -> None:
     df.round(3).to_csv(RAW_DIR / f"{key}.csv.gz", compression="gzip")
 
 
-def update_cache(client, no_match_error, key: str, code: str, start_default: str) -> pd.DataFrame | None:
+def update_cache(client, no_match_error, key: str, code: str, start_default: str,
+                 price_only: bool = False) -> pd.DataFrame | None:
     cached = load_cache(key)
     now_local = pd.Timestamp.now(tz=TZ)
     end = now_local.normalize() + pd.Timedelta(days=2)   # day-ahead för i morgon finns efter ca 13:00
@@ -155,7 +171,7 @@ def update_cache(client, no_match_error, key: str, code: str, start_default: str
     else:
         start = pd.Timestamp(start_default, tz=TZ)
     log.info("%s: hämtar %s → %s", key, start.date(), end.date())
-    new = fetch_zone(client, no_match_error, code, start, end)
+    new = fetch_zone(client, no_match_error, code, start, end, price_only)
     if new is None:
         log.warning("%s: ingen ny data", key)
         return cached
@@ -271,6 +287,70 @@ def lst(series, nd: int = 2) -> list:
     return [None if pd.isna(v) else round(float(v), nd) for v in series]
 
 
+def compute_coupling(prices: pd.DataFrame, focus: list[str], months: list[str]) -> dict:
+    """
+    Andel timmar då varje område har exakt samma day-ahead-pris som varje annat område.
+    Lika pris betyder att marknaderna är sammankopplade just då (ingen flaskhals emellan).
+    Per område och partner returneras
+      m   månadsvis andel (alla månader)
+      sh  andel per timme på dygnet för de senaste 12 månaderna: hela året + fyra säsonger
+    "_alone" = timmar då inget annat område hade samma pris.
+    """
+    if prices.empty:
+        return {}
+    loc_idx = prices.index.tz_convert(TZ)
+    month = np.asarray(loc_idx.strftime("%Y-%m"))
+    hour = np.asarray(loc_idx.hour)
+    mnum = np.asarray(loc_idx.month)
+    season = np.full(len(prices), "aut", dtype=object)
+    for name, ms in SEASONS.items():
+        season[np.isin(mnum, ms)] = name
+    window = months[-12:]
+    in_win = np.isin(month, window)
+    in_months = np.isin(month, months)
+    cols = list(prices.columns)
+    arr = {c: prices[c].to_numpy(dtype=float) for c in cols}
+
+    result = {}
+    for f in focus:
+        if f not in arr:
+            continue
+        pf = arr[f]
+        fvalid = ~np.isnan(pf)
+        masks = {}
+        any_valid = np.zeros(len(pf), dtype=bool)
+        any_eq = np.zeros(len(pf), dtype=bool)
+        for p in cols:
+            if p == f:
+                continue
+            valid = fvalid & ~np.isnan(arr[p])
+            eq = valid & (np.abs(pf - arr[p]) < EQUAL_TOL)
+            masks[p] = (eq, valid)
+            any_valid |= valid
+            any_eq |= eq
+        masks["_alone"] = (any_valid & ~any_eq, any_valid)
+
+        out = {}
+        for p, (eq, valid) in masks.items():
+            mdf = pd.DataFrame({"m": month, "eq": eq, "v": valid})[in_months].groupby("m")[["eq", "v"]].sum()
+            m_share = []
+            for m in months:
+                if m in mdf.index and mdf.loc[m, "v"] >= 0.5 * pd.Period(m, "M").days_in_month * 24:
+                    m_share.append(round(float(mdf.loc[m, "eq"] / mdf.loc[m, "v"]), 3))
+                else:
+                    m_share.append(None)
+            wdf = pd.DataFrame({"s": season, "h": hour, "eq": eq, "v": valid})[in_win]
+            sh = {}
+            for sname in ["all"] + list(SEASONS):
+                sub = wdf if sname == "all" else wdf[wdf["s"] == sname]
+                g = sub.groupby("h")[["eq", "v"]].sum().reindex(range(24))
+                sh[sname] = [None if (pd.isna(v) or v < 20) else round(float(e / v), 3)
+                             for e, v in zip(g["eq"], g["v"])]
+            out[p] = {"m": m_share, "sh": sh}
+        result[f] = out
+    return result
+
+
 # --------------------------------------------------------------------------- #
 # Demodata (för att förhandsgranska dashboarden utan token)
 # --------------------------------------------------------------------------- #
@@ -294,17 +374,37 @@ def demo_frame(key: str, seed: int) -> pd.DataFrame:
     cloud = np.clip(0.75 + 0.2 * rng.normal(size=n) * 0.5, 0.2, 1.0)
     solar_cf = sun * (0.45 + 0.4 * (-winter)) * cloud
 
-    level = {"SE1": 0.45, "SE2": 0.5, "SE3": 0.85, "SE4": 1.0, "DE": 1.5, "DK1": 1.3, "DK2": 1.3, "FI": 0.75}[key]
+    level = {"SE1": 0.45, "SE2": 0.5, "SE3": 0.85, "SE4": 1.0, "DE": 1.5, "DK1": 1.3, "DK2": 1.3, "FI": 0.75}.get(key, 0.9)
     shape = 10 * np.exp(-((hour - 8) ** 2) / 8) + 16 * np.exp(-((hour - 19) ** 2) / 6) - 6 * np.exp(-((hour - 3) ** 2) / 10)
     price = (58 + 24 * winter + shape) * level - 70 * (wind_cf - 0.33) * (0.5 + level / 2)
     price -= 22 * level * solar_cf
     price += rng.normal(scale=6, size=n) + np.where(rng.random(n) < 0.004, rng.normal(120, 60, size=n), 0)
     price = np.maximum(price, -40)
 
-    wind_mw = {"SE1": 900, "SE2": 2300, "SE3": 2000, "SE4": 1500, "DE": 55000, "DK1": 4500, "DK2": 1800, "FI": 6500}[key] * wind_cf
+    wind_mw = {"SE1": 900, "SE2": 2300, "SE3": 2000, "SE4": 1500, "DE": 55000, "DK1": 4500, "DK2": 1800, "FI": 6500}.get(key, 1000) * wind_cf
     solar_mw = {"SE3": 700, "SE4": 600, "DE": 70000, "DK1": 2800, "DK2": 1500, "FI": 900}.get(key)
     solar = solar_mw * solar_cf if solar_mw else np.full(n, np.nan)   # SE1/SE2 saknar solrapportering
-    return pd.DataFrame({"price": price, "wind": wind_mw, "solar": solar}, index=idx)
+    df = pd.DataFrame({"price": price, "wind": wind_mw, "solar": solar}, index=idx)
+    if ZONES[key].get("ref"):
+        df["wind"] = np.nan
+        df["solar"] = np.nan
+    return df
+
+
+DEMO_LINKS = [("SE1", "SE2", .75), ("SE2", "SE3", .5), ("SE3", "SE4", .45), ("SE3", "NO1", .55), ("SE3", "FI", .4),
+              ("SE1", "FI", .4), ("SE1", "NO4", .45), ("SE2", "NO3", .5), ("NO3", "NO4", .6), ("NO1", "NO2", .5),
+              ("NO1", "NO5", .6), ("NO2", "DK1", .3), ("SE3", "DK1", .3), ("SE4", "DK2", .5), ("SE4", "DE", .35),
+              ("SE4", "PL", .3), ("SE4", "LT", .3), ("DK1", "DE", .7), ("DK1", "DK2", .55)]
+
+
+def couple_demo(frames: dict) -> None:
+    """Gör demopriserna delvis lika mellan grannområden så att prissambandsfliken har något att visa."""
+    rng = np.random.default_rng(7)
+    for a, b, prob in DEMO_LINKS:
+        if a in frames and b in frames:
+            idx = frames[a].index.intersection(frames[b].index)
+            sel = idx[rng.random(len(idx)) < prob]
+            frames[b].loc[sel, "price"] = frames[a].loc[sel, "price"].to_numpy()
 
 
 # --------------------------------------------------------------------------- #
@@ -337,7 +437,7 @@ def main() -> int:
         from entsoe.exceptions import NoMatchingDataError
         client, no_match = EntsoePandasClient(api_key=token), NoMatchingDataError
 
-    summary_zones, recent_zones = {}, {}
+    frames = {}
     for i, key in enumerate(keys):
         info = ZONES[key]
         if args.demo:
@@ -345,16 +445,24 @@ def main() -> int:
         elif args.no_fetch:
             df = load_cache(key)
         else:
-            df = update_cache(client, no_match, key, info["code"], args.start)
+            df = update_cache(client, no_match, key, info["code"], args.start, price_only=info.get("ref", False))
         if df is None or df.empty:
             log.warning("%s: ingen data, hoppar över", key)
             continue
+        frames[key] = df
+    if args.demo:
+        couple_demo(frames)
+
+    summary_zones, recent_zones = {}, {}
+    for key, df in frames.items():
+        if ZONES[key].get("ref"):
+            continue                       # referensområden används bara för prissamband
         result = compute_zone(df, include_partial=args.include_partial)
         if result is None:
             log.warning("%s: för lite data för att räkna", key)
             continue
         zone_out, recent_out = result
-        zone_out["name"] = info["name"]
+        zone_out["name"] = ZONES[key]["name"]
         summary_zones[key] = zone_out
         recent_zones[key] = recent_out
 
@@ -371,6 +479,23 @@ def main() -> int:
         encoding="utf-8")
     (OUT_DIR / "recent.json").write_text(
         json.dumps({"generated": stamp, "zones": recent_zones}, ensure_ascii=False, separators=(",", ":")),
+        encoding="utf-8")
+
+    # ---- prissamband ----------------------------------------------------- #
+    prices = pd.DataFrame({k: df["price"] for k, df in frames.items()}).sort_index()
+    if "PL" in prices and "DE" in prices:
+        pl, de = prices["PL"].median(), prices["DE"].median()
+        if de and pl / de > 2.5:
+            log.warning("PL-priserna ser ut att vara i PLN och inte EUR (median %.0f mot DE %.0f). "
+                        "Prissambandet för Polen blir då missvisande.", pl, de)
+    months_all = sorted({m for z in summary_zones.values() for m in z["months"]})
+    coupling = compute_coupling(prices, list(summary_zones), months_all)
+    (OUT_DIR / "coupling.json").write_text(
+        json.dumps({"generated": stamp, "demo": bool(args.demo),
+                    "names": {k: ZONES[k]["name"] for k in frames},
+                    "order": list(frames), "focus": list(coupling),
+                    "months": months_all, "window": months_all[-12:], "pairs": coupling},
+                   ensure_ascii=False, separators=(",", ":")),
         encoding="utf-8")
     log.info("Klart: %d områden skrivna till %s", len(summary_zones), OUT_DIR)
     return 0
