@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Marknadskännedom – Bouncy Energy</title>
+<title>Swedish electricity market – Bouncy Energy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -136,6 +136,26 @@
   .slider-row input[type="range"] { flex: 1 1 220px; max-width: 420px; accent-color: var(--ink); }
   .slider-row output { font: 700 15px var(--font-head); min-width: 130px; }
 
+  .ov-lead { font-size: 15px; margin: 0 0 14px; max-width: 70ch; color: var(--ink); }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin: 0 0 18px; }
+  .kpi-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 10px; }
+  .kpi-card h3 { font: 700 18px/1.2 var(--font-head); margin: 0 0 2px; }
+  .kpi-card .kpi-def { color: var(--muted); font-size: 12.5px; margin: 0 0 8px; }
+  .kpi-card .kpi-summary { font: 600 13px var(--font-body); margin: 0 0 8px; padding: 3px 9px; background: var(--paper); border-radius: 6px; display: inline-block; }
+  .kpi-rows { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .kpi-rows td { padding: 6px 0; border-top: 1px solid var(--line); }
+  .kpi-rows td.z { font-weight: 600; width: 46px; }
+  .kpi-rows td.v { text-align: right; font: 700 15px var(--font-head); padding-right: 10px; white-space: nowrap; }
+  .kpi-rows td.d { text-align: right; white-space: nowrap; width: 104px; color: var(--muted); font-size: 13px; }
+  .arrow { font-size: 12px; margin-right: 4px; }
+  .arrow.up { color: var(--wind); }
+  .arrow.down { color: #b87500; }
+  .arrow.flat { color: var(--muted); }
+  .ov-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 8px; }
+  .ov-charts .chart-block { margin-bottom: 0; }
+  .ov-charts .chart { height: 300px; }
+  @media (max-width: 820px) { .ov-charts { grid-template-columns: 1fr; } }
+
   /* Diagram */
   .panel[hidden] { display: none; }
   .chart-block { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 14px 6px; margin-bottom: 16px; }
@@ -175,66 +195,98 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Marknadskännedom</h1>
-  <p class="lede">Elpriser, capture rates, spreadar och produktion för svenska elområden, med Finland, Danmark och Tyskland som jämförelse. Uppdateras varje natt från ENTSO-E.</p>
+  <h1>Swedish electricity market</h1>
+  <p class="lede">Prices, volatility, solar capture rates and consumption for the four Swedish bidding zones, with Finland, Denmark and Germany as comparison. Updated every night from ENTSO-E.</p>
 
-  <div id="demo-banner" class="banner" hidden>Du tittar på demodata (syntetiska värden). Riktiga värden visas efter första körningen mot ENTSO-E.</div>
+  <div id="demo-banner" class="banner" hidden>You are viewing demo data (synthetic values). Real values appear after the first run against ENTSO-E.</div>
   <div id="error" class="banner" hidden></div>
 
-  <div class="zones" id="zones" role="group" aria-label="Elområde"></div>
-  <p class="axis-note" id="axis-note">Y-axlarna är gemensamma för alla elområden (utom produktion i MW), så du kan byta område och jämföra direkt.</p>
+  <div class="zones" id="zones" role="group" aria-label="Bidding zone"></div>
+  <p class="axis-note" id="axis-note">The y-axes are shared across all bidding zones (except production in MW), so you can switch zone and compare directly.</p>
 
   <dl class="kpis" id="kpis"></dl>
 
   <div class="tabs" role="tablist" id="tabs">
-    <button role="tab" data-tab="capture" aria-selected="true">Capture rate</button>
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="capture" aria-selected="false">Capture rate</button>
     <button role="tab" data-tab="duck" aria-selected="false">Duck curve</button>
-    <button role="tab" data-tab="solar" aria-selected="false">Solpark + BESS</button>
-    <button role="tab" data-tab="depth" aria-selected="false">Arbitragedjup</button>
-    <button role="tab" data-tab="recent" aria-selected="false">Pris och produktion</button>
+    <button role="tab" data-tab="solar" aria-selected="false">Solar park + BESS</button>
+    <button role="tab" data-tab="depth" aria-selected="false">Arbitrage depth</button>
+    <button role="tab" data-tab="recent" aria-selected="false">Price and production</button>
   </div>
 
-  <div class="zonebar" id="zonebar" role="group" aria-label="Välj elområden">
-      <span class="zonebar-label">Elområden</span>
+  <div class="zonebar" id="zonebar" role="group" aria-label="Select bidding zones">
+      <span class="zonebar-label">Bidding zones</span>
       <div class="chips" id="zone-chips"></div>
       <div class="quick" id="zonebar-quick">
-        <button data-quick="all">Alla</button>
+        <button data-quick="all">All</button>
         <button data-quick="se">SE1–4</button>
-        <button data-quick="none">Inga</button>
+        <button data-quick="none">None</button>
       </div>
     </div>
 
-  <!-- Capture rate -->
-  <section class="panel" id="panel-capture">
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Teknik" id="seg-tech">
-        <button data-tech="wind" aria-pressed="true">Vind</button>
-        <button data-tech="solar" aria-pressed="false">Sol</button>
+  <!-- Overview -->
+  <section class="panel" id="panel-overview">
+    <p class="ov-lead" id="ov-lead"></p>
+    <div class="kpi-grid" id="ov-kpis"></div>
+    <div class="ov-charts">
+      <div class="chart-block">
+        <h2>Electricity price</h2>
+        <p class="sub">Average day-ahead price, rolling 12 months, EUR/MWh.</p>
+        <div class="chart" id="ov-chart-price"></div>
       </div>
-      <div class="seg" role="group" aria-label="Beräkning" id="seg-view">
-        <button data-view="monthly" aria-pressed="true">Månadsvis</button>
-        <button data-view="rolling" aria-pressed="false">Rullande 12 mån</button>
+      <div class="chart-block">
+        <h2>Price volatility</h2>
+        <p class="sub">Average daily spread between the highest and lowest hourly price, rolling 12 months, EUR/MWh.<sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
+        <div class="chart" id="ov-chart-vol"></div>
+      </div>
+      <div class="chart-block">
+        <h2>Solar capture rate</h2>
+        <p class="sub">Price earned by solar as a percentage of the average price, rolling 12 months.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
+        <div class="chart" id="ov-chart-solar"></div>
+        <p class="note" id="ov-note-solar"></p>
+      </div>
+      <div class="chart-block">
+        <h2>Electricity consumption</h2>
+        <p class="sub">Total consumption, rolling 12 months, TWh.<sup><a href="#n16">16</a></sup></p>
+        <div class="chart" id="ov-chart-cons"></div>
+        <p class="note" id="ov-note-cons"></p>
+      </div>
+    </div>
+    <p class="note" id="ov-note"></p>
+  </section>
+
+  <!-- Capture rate -->
+  <section class="panel" id="panel-capture" hidden>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Technology" id="seg-tech">
+        <button data-tech="wind" aria-pressed="true">Wind</button>
+        <button data-tech="solar" aria-pressed="false">Solar</button>
+      </div>
+      <div class="seg" role="group" aria-label="Calculation" id="seg-view">
+        <button data-view="monthly" aria-pressed="true">Monthly</button>
+        <button data-view="rolling" aria-pressed="false">Rolling 12 mo</button>
       </div>
       <div class="seg" role="group" aria-label="Period" id="seg-range">
-        <button data-range="12" aria-pressed="true">12 mån</button>
-        <button data-range="24" aria-pressed="false">24 mån</button>
-        <button data-range="0" aria-pressed="false">Allt</button>
+        <button data-range="12" aria-pressed="true">12 mo</button>
+        <button data-range="24" aria-pressed="false">24 mo</button>
+        <button data-range="0" aria-pressed="false">All</button>
       </div>
     </div>
     <p class="note alert" id="note-nozones-c"></p>
     <div class="chart-block">
       <h2 id="rate-title">Capture rate</h2>
-      <p class="sub">Produktionsviktat pris i procent av genomsnittspriset. Under 100 % betyder att tekniken får lägre pris än snittet.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
+      <p class="sub">Production-weighted price as a percentage of the average price. Below 100 % means the technology earns less than the average.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
       <div class="chart" id="chart-rate"></div>
       <p class="note" id="note-rate"></p>
     </div>
     <div class="chart-block">
       <h2 id="price-title">Capture price</h2>
-      <p class="sub">Euro per megawattimme.</p>
+      <p class="sub">Euro per megawatt-hour.</p>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Snittpris" id="seg-base">
-          <button data-base="off" aria-pressed="true">Bara capture price</button>
-          <button data-base="on" aria-pressed="false">Visa även snittpris (prickad)</button>
+        <div class="seg" role="group" aria-label="Average price" id="seg-base">
+          <button data-base="off" aria-pressed="true">Capture price only</button>
+          <button data-base="on" aria-pressed="false">Also show average price (dotted)</button>
         </div>
       </div>
       <div class="chart" id="chart-price"></div>
@@ -246,21 +298,21 @@
     <p class="note alert" id="note-nozones"></p>
 
     <div class="controls">
-      <div class="seg" role="group" aria-label="Period för tidsdiagrammen" id="seg-range3">
-        <button data-range="12" aria-pressed="true">12 mån</button>
-        <button data-range="24" aria-pressed="false">24 mån</button>
-        <button data-range="0" aria-pressed="false">Allt</button>
+      <div class="seg" role="group" aria-label="Period for the time charts" id="seg-range3">
+        <button data-range="12" aria-pressed="true">12 mo</button>
+        <button data-range="24" aria-pressed="false">24 mo</button>
+        <button data-range="0" aria-pressed="false">All</button>
       </div>
     </div>
 
     <div class="chart-block">
-      <h2 id="profile-title">Dygnsprofil</h2>
-      <p class="sub">Genomsnittligt pris för varje timme på dygnet (svensk tid) för valda områden. Ett prisdjup mitt på dagen följt av en kvällstopp brukar kallas duck curve. Heldragen linje är senaste 12 mån, streckad är månad 13–24.<sup><a href="#n7">7</a>, <a href="#n8">8</a></sup></p>
+      <h2 id="profile-title">Daily profile</h2>
+      <p class="sub">Average price for each hour of the day (Swedish time) for the selected zones. A price dip in the middle of the day followed by an evening peak is often called the duck curve. Solid line is the latest 12 months, dashed is months 13–24.<sup><a href="#n7">7</a>, <a href="#n8">8</a></sup></p>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Säsong" id="seg-profile">
-          <button data-profile="all" aria-pressed="true">Hela året</button>
-          <button data-profile="sum" aria-pressed="false">Sommar (apr–sep)</button>
-          <button data-profile="win" aria-pressed="false">Vinter (okt–mar)</button>
+        <div class="seg" role="group" aria-label="Season" id="seg-profile">
+          <button data-profile="all" aria-pressed="true">Whole year</button>
+          <button data-profile="sum" aria-pressed="false">Summer (Apr–Sep)</button>
+          <button data-profile="win" aria-pressed="false">Winter (Oct–Mar)</button>
         </div>
       </div>
       <div class="chart" id="chart-profile"></div>
@@ -268,18 +320,18 @@
     </div>
 
     <div class="chart-block">
-      <h2>Andel negativa priser per elområde</h2>
+      <h2>Share of negative prices per bidding zone</h2>
       <p class="sub" id="negshare-sub"></p>
       <div class="chart" id="chart-negshare"></div>
     </div>
 
     <div class="chart-block">
-      <h2 id="spreadtrend-title">Dygnsspread (högsta minus lägsta)</h2>
-      <p class="sub">Månadsmedel av dygnets högsta minus lägsta timpris, euro per megawattimme.<sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
+      <h2 id="spreadtrend-title">Daily spread (highest minus lowest)</h2>
+      <p class="sub">Monthly average of the day's highest minus lowest hourly price, euro per megawatt-hour.<sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Spreadvy" id="seg-dview">
-          <button data-dview="rolling" aria-pressed="true">Rullande 12 mån</button>
-          <button data-dview="monthly" aria-pressed="false">Månadsvis</button>
+        <div class="seg" role="group" aria-label="Spread view" id="seg-dview">
+          <button data-dview="rolling" aria-pressed="true">Rolling 12 mo</button>
+          <button data-dview="monthly" aria-pressed="false">Monthly</button>
         </div>
       </div>
       <div class="chart" id="chart-spreadtrend"></div>
@@ -287,26 +339,26 @@
     </div>
 
     <div class="chart-block">
-      <h2 id="day-title">Dagpris kl 10–14</h2>
-      <p class="sub">Medelpris för timmarna 10–14 (svensk tid), euro per megawattimme. Dag- och nattpris visas alltid på samma sätt och med samma skala, så att de går att jämföra.<sup><a href="#n7">7</a></sup></p>
+      <h2 id="day-title">Daytime price 10:00–14:00</h2>
+      <p class="sub">Average price for the hours 10–14 (Swedish time), euro per megawatt-hour. Daytime and night-time prices are always shown the same way and on the same scale so they can be compared.<sup><a href="#n7">7</a></sup></p>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Beräkning dagpris" id="seg-dn">
-          <button data-dn="rolling" aria-pressed="true">Rullande 12 mån</button>
-          <button data-dn="rolling6" aria-pressed="false">Rullande 6 mån</button>
-          <button data-dn="monthly" aria-pressed="false">Månadsvis</button>
+        <div class="seg" role="group" aria-label="Calculation, daytime price" id="seg-dn">
+          <button data-dn="rolling" aria-pressed="true">Rolling 12 mo</button>
+          <button data-dn="rolling6" aria-pressed="false">Rolling 6 mo</button>
+          <button data-dn="monthly" aria-pressed="false">Monthly</button>
         </div>
       </div>
       <div class="chart" id="chart-day"></div>
     </div>
 
     <div class="chart-block">
-      <h2 id="night-title">Nattpris kl 00–04</h2>
-      <p class="sub">Medelpris för timmarna 00–04 (svensk tid), euro per megawattimme.<sup><a href="#n7">7</a></sup></p>
+      <h2 id="night-title">Night-time price 00:00–04:00</h2>
+      <p class="sub">Average price for the hours 00–04 (Swedish time), euro per megawatt-hour.<sup><a href="#n7">7</a></sup></p>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Beräkning nattpris" id="seg-dn2">
-          <button data-dn="rolling" aria-pressed="true">Rullande 12 mån</button>
-          <button data-dn="rolling6" aria-pressed="false">Rullande 6 mån</button>
-          <button data-dn="monthly" aria-pressed="false">Månadsvis</button>
+        <div class="seg" role="group" aria-label="Calculation, night-time price" id="seg-dn2">
+          <button data-dn="rolling" aria-pressed="true">Rolling 12 mo</button>
+          <button data-dn="rolling6" aria-pressed="false">Rolling 6 mo</button>
+          <button data-dn="monthly" aria-pressed="false">Monthly</button>
         </div>
       </div>
       <div class="chart" id="chart-night"></div>
@@ -318,46 +370,46 @@
   <section class="panel" id="panel-solar" hidden>
     <p class="note alert" id="note-solar"></p>
     <div class="chart-block">
-      <h2>Fiktiv solpark med batteri</h2>
+      <h2>Fictional solar park with battery</h2>
       <p class="sub"><span id="solar-intro"></span><sup><a href="#n9">9</a>, <a href="#n10">10</a></sup></p>
     </div>
 
     <div class="chart-block">
-      <h2>Capture rate, senaste 12 månaderna</h2>
-      <p class="sub">Solparkens produktionsviktade pris i procent av områdets genomsnittspris, utan och med batteri på 1, 2 och 4 timmar.<sup><a href="#n1">1</a>, <a href="#n10">10</a></sup></p>
+      <h2>Capture rate, last 12 months</h2>
+      <p class="sub">The solar park's production-weighted price as a percentage of the zone's average price, without and with a battery of 1, 2 and 4 hours.<sup><a href="#n1">1</a>, <a href="#n10">10</a></sup></p>
       <div class="chart" id="chart-solar-rate"></div>
     </div>
 
     <div class="chart-block">
-      <h2>Capture price, senaste 12 månaderna</h2>
-      <p class="sub">Euro per producerad megawattimme. Batteriförluster är inräknade.<sup><a href="#n11">11</a></sup></p>
+      <h2>Capture price, last 12 months</h2>
+      <p class="sub">Euro per produced megawatt-hour. Battery losses are included.<sup><a href="#n11">11</a></sup></p>
       <div class="chart" id="chart-solar-price"></div>
     </div>
 
     <div class="chart-block">
-      <h2>Nyckeltal</h2>
-      <p class="sub">Höjningen visar capture price jämfört med solparken utan batteri. Andel via batteriet är den del av produktionen som laddas in, och cykler är urladdad energi delat med batteriets kapacitet.</p>
+      <h2>Key figures</h2>
+      <p class="sub">The uplift shows capture price compared with the solar park without a battery. Share via battery is the part of production that is charged into the battery, and cycles is discharged energy divided by battery capacity.</p>
       <div class="data-table-wrap" id="solar-table"></div>
     </div>
 
     <div class="controls">
-      <label class="sel">Område för diagrammen nedan
+      <label class="sel">Zone for the charts below
         <select id="sel-solzone"></select>
       </label>
     </div>
 
     <div class="chart-block">
-      <h2 id="solar-monthly-title">Månad för månad</h2>
-      <p class="sub">Capture rate per månad för valt område.</p>
+      <h2 id="solar-monthly-title">Month by month</h2>
+      <p class="sub">Capture rate per month for the selected zone.</p>
       <div class="chart" id="chart-solar-monthly"></div>
     </div>
 
     <div class="chart-block">
-      <h2 id="solar-day-title">Exempeldag</h2>
-      <p class="sub">En typisk dag: den med medianproduktion i vald månad. Visar solproduktionen, vad som levereras efter batteriet och day-ahead-priset (höger axel).</p>
+      <h2 id="solar-day-title">Example day</h2>
+      <p class="sub">A typical day: the one with median production in the chosen month. Shows solar production, what is delivered after the battery, and the day-ahead price (right axis).</p>
       <div class="controls inner">
-        <label class="sel">Månad <select id="sel-solmonth"></select></label>
-        <div class="seg" role="group" aria-label="Batteri" id="seg-solscn">
+        <label class="sel">Month <select id="sel-solmonth"></select></label>
+        <div class="seg" role="group" aria-label="Battery" id="seg-solscn">
           <button data-scn="1h" aria-pressed="false">1 h</button>
           <button data-scn="2h" aria-pressed="true">2 h</button>
           <button data-scn="4h" aria-pressed="false">4 h</button>
@@ -371,34 +423,34 @@
   <section class="panel" id="panel-depth" hidden>
     <p class="note alert" id="note-depth"></p>
     <div class="chart-block">
-      <h2>Hur många batterier tål arbitragemarknaden?</h2>
-      <p class="sub">Modell av day-ahead-arbitrage när fler batterier kommer in. Flottan laddar och laddar ur på dygnets billigaste och dyraste timmar, och det flyttar själva priset. Vid vilken flottstorlek faller intäkten per MW, och hur mycket krymper spreaden? Det beror på hur känsligt priset är. Det skattas från historisk last, vind, sol och pris (se längre ned), eller så ställer du in det själv.<sup><a href="#n12">12</a>, <a href="#n13">13</a></sup></p>
+      <h2>How many batteries can the arbitrage market take?</h2>
+      <p class="sub">Model of day-ahead arbitrage as more batteries enter. The fleet charges and discharges in the day's cheapest and most expensive hours, and that moves the price itself. At what fleet size does revenue per MW fall, and how much does the spread shrink? It depends on how sensitive the price is. That is estimated from historical load, wind, solar and price (see further down), or you can set it yourself.<sup><a href="#n12">12</a>, <a href="#n13">13</a></sup></p>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Batteriets varaktighet" id="seg-depthdur">
+        <div class="seg" role="group" aria-label="Battery duration" id="seg-depthdur">
           <button data-ddur="1h" aria-pressed="false">1 h</button>
           <button data-ddur="2h" aria-pressed="true">2 h</button>
           <button data-ddur="4h" aria-pressed="false">4 h</button>
         </div>
-        <div class="seg" role="group" aria-label="Flottans storlek på x-axeln" id="seg-depthmax">
+        <div class="seg" role="group" aria-label="Fleet size on the x-axis" id="seg-depthmax">
           <button data-dmax="5" aria-pressed="false">0–5 GW</button>
           <button data-dmax="10" aria-pressed="true">0–10 GW</button>
           <button data-dmax="20" aria-pressed="false">0–20 GW</button>
         </div>
       </div>
       <div class="controls inner">
-        <div class="seg" role="group" aria-label="Källa för prispåverkan" id="seg-depthmode">
-          <button data-dmode="est" aria-pressed="true">Skattad från data</button>
-          <button data-dmode="manual" aria-pressed="false">Manuell</button>
+        <div class="seg" role="group" aria-label="Source of price impact" id="seg-depthmode">
+          <button data-dmode="est" aria-pressed="true">Estimated from data</button>
+          <button data-dmode="manual" aria-pressed="false">Manual</button>
         </div>
       </div>
       <div class="slider-row">
-        <label for="rng-depth">Prispåverkan</label>
+        <label for="rng-depth">Price impact</label>
         <input type="range" id="rng-depth" min="0.5" max="60" step="0.5" value="15" aria-describedby="depth-help">
         <output id="depth-s-label"></output>
-        <div class="seg" role="group" aria-label="Förinställningar" id="seg-depthpre">
-          <button data-dpre="5" id="pre-low">Lägst</button>
+        <div class="seg" role="group" aria-label="Presets" id="seg-depthpre">
+          <button data-dpre="5" id="pre-low">Lowest</button>
           <button data-dpre="15" id="pre-mid">Median</button>
-          <button data-dpre="40" id="pre-high">Högst</button>
+          <button data-dpre="40" id="pre-high">Highest</button>
         </div>
       </div>
       <p class="note" id="depth-help"></p>
@@ -406,40 +458,40 @@
     </div>
 
     <div class="chart-block">
-      <h2>Intäkt per MW och år, efter flottans storlek</h2>
-      <p class="sub">Kilo-euro per installerad MW och år från day-ahead-arbitrage. Rutan markerar där intäkten har halverats jämfört med första MW.</p>
+      <h2>Revenue per MW and year, by fleet size</h2>
+      <p class="sub">Thousand euro per installed MW and year from day-ahead arbitrage. The diamond marks where revenue has halved compared with the first MW.</p>
       <div class="chart" id="chart-depth-rev"></div>
     </div>
 
     <div class="chart-block">
-      <h2>Dygnsspread efter batterierna</h2>
-      <p class="sub">Genomsnittlig skillnad mellan dygnets högsta och lägsta timpris i euro per megawattimme, när flottan har gjort sitt jobb.</p>
+      <h2>Daily spread after the batteries</h2>
+      <p class="sub">Average difference between the day's highest and lowest hourly price in euro per megawatt-hour, once the fleet has done its job.</p>
       <div class="chart" id="chart-depth-spread"></div>
     </div>
 
     <div class="chart-block">
-      <h2>Mättnadspunkter</h2>
-      <p class="sub">Flottans storlek (i GW) där intäkten per MW har sjunkit till 75, 50 respektive 25 % av första MW:s intäkt, vid vald prispåverkan.</p>
+      <h2>Saturation points</h2>
+      <p class="sub">Fleet size (in GW) where revenue per MW has fallen to 75, 50 and 25 % of the first MW's revenue, at the chosen price impact.</p>
       <div class="data-table-wrap" id="depth-table"></div>
       <p class="note" id="note-depth-ref"></p>
     </div>
 
     <div class="chart-block">
-      <h2>Empiriskt underlag: hur mycket rör sig priset per GW?</h2>
-      <p class="sub">Skattningen jämför timpriset med restlasten (förbrukning minus vind och sol) de senaste 24 månaderna, med hänsyn till månad och timme på dygnet. Vind och väder gör att restlasten varierar av sig själv, och priset följer. Det är samma sak som ett batteri gör när det laddar eller laddar ur.<sup><a href="#n14">14</a>, <a href="#n15">15</a></sup></p>
+      <h2>Empirical basis: how much does the price move per GW?</h2>
+      <p class="sub">The estimate compares the hourly price with residual load (consumption minus wind and solar) over the last 24 months, accounting for month and hour of day. Wind and weather make residual load vary on its own, and the price follows. That is the same thing a battery does when it charges or discharges.<sup><a href="#n14">14</a>, <a href="#n15">15</a></sup></p>
       <div class="data-table-wrap" id="slope-table"></div>
       <p class="note" id="note-slope"></p>
     </div>
 
     <div class="chart-block">
-      <h2>Sambandet pris mot restlast</h2>
-      <p class="sub">Genomsnittligt prisavvikelse (euro per MWh) för tjugo lika stora grupper av timmar sorterade efter restlast (GW, avvikelse från normalt för månad och klockslag). Punkterna visar om sambandet är rakt, och den streckade linjen är den skattade lutningen.</p>
+      <h2>The relationship between price and residual load</h2>
+      <p class="sub">Average price deviation (euro per MWh) for twenty equally sized groups of hours sorted by residual load (GW, deviation from normal for the month and time of day). The dots show whether the relationship is straight, and the dashed line is the estimated slope.</p>
       <div class="chart" id="chart-slope-bins"></div>
     </div>
 
     <div class="chart-block">
-      <h2>Prispåverkan över dygnet</h2>
-      <p class="sub">Samma skattning uppdelad på tid på dygnet, med 95 %-intervall. Batterier laddar oftast på natten och mitt på dagen och laddar ur på kvällen.</p>
+      <h2>Price impact over the day</h2>
+      <p class="sub">The same estimate split by time of day, with 95 % intervals. Batteries usually charge at night and in the middle of the day and discharge in the evening.</p>
       <div class="chart" id="chart-slope-dayparts"></div>
     </div>
   </section>
@@ -447,105 +499,115 @@
   <!-- Senaste dygnen -->
   <section class="panel" id="panel-recent" hidden>
     <div class="chart-block">
-      <h2>Day-ahead-pris, senaste två veckorna</h2>
-      <p class="sub">Euro per megawattimme, timvärden i svensk tid.<sup><a href="#n5">5</a></sup></p>
+      <h2>Day-ahead price, last two weeks</h2>
+      <p class="sub">Euro per megawatt-hour, hourly values in Swedish time.<sup><a href="#n5">5</a></sup></p>
       <div class="chart" id="chart-hourly"></div>
     </div>
     <div class="chart-block">
-      <h2>Produktion av vind och sol</h2>
-      <p class="sub">Genomsnittlig effekt per timme i megawatt.<sup><a href="#n4">4</a></sup></p>
+      <h2>Wind and solar production</h2>
+      <p class="sub">Average power per hour in megawatts.<sup><a href="#n4">4</a></sup></p>
       <div class="chart" id="chart-prod"></div>
       <p class="note" id="note-prod"></p>
     </div>
   </section>
 
   <section class="defs" id="definitioner">
-    <h2>Definitioner och noter</h2>
+    <h2>Definitions and notes</h2>
 
     <dl>
-      <dt>Day-ahead-pris</dt>
-      <dd>Elbörsens pris för nästa dygn, fastställt dagen innan, per elområde och i euro per megawattimme (EUR/MWh). Det är inte slutkundspriset, och det innehåller varken skatter, nätavgifter eller elhandlarens påslag. Intradagspriser och balanspriser ingår inte.</dd>
+      <dt>Day-ahead price</dt>
+      <dd>The power exchange's price for the next day, set the day before, per bidding zone and in euro per megawatt-hour (EUR/MWh). It is not the end-customer price, and it includes neither taxes, grid fees nor the retailer's margin. Intraday and balancing prices are not included.</dd>
 
-      <dt>Elområde</dt>
-      <dd>Sverige är uppdelat i fyra (SE1–SE4). Finland, Danmark (DK1 och DK2) och Tyskland (här DE-LU, tillsammans med Luxemburg) visas som jämförelse.</dd>
+      <dt>Bidding zone</dt>
+      <dd>Sweden is divided into four (SE1–SE4). Finland, Denmark (DK1 and DK2) and Germany (here DE-LU, together with Luxembourg) are shown for comparison.</dd>
 
-      <dt>Snittpris</dt>
-      <dd>Genomsnittligt day-ahead-pris under perioden, där alla timmar väger lika.</dd>
+      <dt>Average price</dt>
+      <dd>The average day-ahead price over the period, where all hours carry equal weight.</dd>
+
+      <dt>Price volatility</dt>
+      <dd>Here measured as the average daily spread, the day's highest minus lowest hourly price, over the latest twelve months. Larger swings within the day mean more room for flexibility such as batteries and demand response.</dd>
+
+      <dt>Consumption</dt>
+      <dd>Actual total load per bidding zone as reported to ENTSO-E, summed over twelve months and shown in terawatt-hours (TWh).</dd>
+
+      <dt>Arrows (Overview)</dt>
+      <dd>Compare the latest 12 months with the 12 months before. An arrow pointing up or down means a change of more than 1 % (for solar capture rate, more than 1 percentage point). Smaller changes are shown as flat. The arrows show direction only, not whether a change is good or bad.</dd>
 
       <dt>Capture price</dt>
-      <dd>Det genomsnittspris en teknik fått när den producerat, det vill säga priset viktat med produktionen timme för timme.</dd>
+      <dd>The average price a technology has received when it produced, that is, the price weighted by production hour by hour.</dd>
 
       <dt>Capture rate</dt>
-      <dd>Capture price delat med snittpriset, i procent. 100 % betyder att tekniken fått ett pris lika med snittet, och lägre värden betyder att produktionen ligger i timmar med lägre pris än genomsnittet.</dd>
+      <dd>Capture price divided by the average price, in percent. 100 % means the technology received a price equal to the average, and lower values mean production falls in hours with lower prices than average.</dd>
 
-      <dt>Rullande 12 månader</dt>
-      <dd>Samma beräkning över de senaste tolv månaderna i ett svep, viktat med produktionen. Det är inte ett medelvärde av tolv månadskvoter. I fliken Duck curve finns även rullande 6 månader för dag- och nattpris. Den streckade linjen visar då samma period ett år tidigare (för rullande 12 månader alltså månad 13–24 bakåt), så att man ser förändring jämfört med året innan.</dd>
+      <dt>Rolling 12 months</dt>
+      <dd>The same calculation over the latest twelve months in one go, weighted by production. It is not an average of twelve monthly ratios. The Duck curve tab also offers rolling 6 months for daytime and night-time prices. The dashed line then shows the same period a year earlier (for rolling 12 months that means months 13–24 back), so that you can see the change compared with the year before.</dd>
 
-      <dt>Dygnsspread</dt>
-      <dd>Skillnaden mellan dygnets högsta och lägsta timpris, i EUR/MWh. Visas som medelvärde över månadens dygn, eller rullande över tolv månader.</dd>
+      <dt>Daily spread</dt>
+      <dd>The difference between the day's highest and lowest hourly price, in EUR/MWh. Shown as an average over the days of the month, or rolling over twelve months.</dd>
 
-      <dt>Andel negativa priser</dt>
-      <dd>Timmar med negativt pris delat med samtliga timmar under perioden, i procent. "Senaste 12 mån" är de tolv senaste fullständiga månaderna och "Månad 13–24" de tolv månaderna dessförinnan.</dd>
+      <dt>Share of negative prices</dt>
+      <dd>Hours with a negative price divided by all hours in the period, in percent. "Latest 12 mo" is the twelve most recent complete months and "Months 13–24" the twelve months before that.</dd>
 
-      <dt>Dagpris och nattpris</dt>
-      <dd>Medelvärdet av timpriserna kl 10–14 respektive kl 00–04 svensk tid, det vill säga timmarna som börjar 10, 11, 12 och 13 respektive 00, 01, 02 och 03.</dd>
+      <dt>Daytime and night-time price</dt>
+      <dd>The average of the hourly prices at 10:00–14:00 and 00:00–04:00 Swedish time respectively, that is, the hours starting at 10, 11, 12 and 13, and at 00, 01, 02 and 03.</dd>
 
-      <dt>Solpark + BESS</dt>
-      <dd>Beräkning för en fiktiv solpark på 1 MWp med batteri (BESS). Batteriet flyttar varje dygn produktion från de billigaste till de dyraste timmarna. "1 h", "2 h" och "4 h" anger hur länge batteriet kan leverera vid full effekt.</dd>
+      <dt>Solar park + BESS</dt>
+      <dd>A calculation for a fictional 1 MWp solar park with a battery (BESS). The battery shifts production each day from the cheapest to the most expensive hours. "1 h", "2 h" and "4 h" state how long the battery can deliver at full power.</dd>
 
-      <dt>Andel via batteriet och cykler</dt>
-      <dd>Andel via batteriet är den del av solparkens produktion som laddas in i batteriet. Cykler är den energi som laddas ur under perioden delat med batteriets kapacitet, alltså antal fulla cykler.</dd>
+      <dt>Share via battery and cycles</dt>
+      <dd>Share via battery is the part of the solar park's production that is charged into the battery. Cycles is the energy discharged during the period divided by the battery's capacity, that is, the number of full cycles.</dd>
 
-      <dt>Arbitragedjup</dt>
-      <dd>Hur stor batteriflotta day-ahead-marknaden kan absorbera innan arbitrage slutar löna sig. Mättnadspunkt är den flottstorlek där intäkten per MW har fallit till en given andel av första MW:s intäkt.</dd>
+      <dt>Arbitrage depth</dt>
+      <dd>How large a battery fleet the day-ahead market can absorb before arbitrage stops paying. The saturation point is the fleet size at which revenue per MW has fallen to a given share of the first MW's revenue.</dd>
 
-      <dt>Prispåverkan</dt>
-      <dd>Hur många euro per megawattimme priset flyttar när en flotta på 1 GW laddar (priset stiger) eller laddar ur (priset sjunker) med full effekt. Det är modellens viktigaste och mest osäkra antagande.</dd>
+      <dt>Price impact</dt>
+      <dd>How many euro per megawatt-hour the price moves when a 1 GW fleet charges (price rises) or discharges (price falls) at full power. It is the model's most important and most uncertain assumption.</dd>
 
       <dt>Duck curve</dt>
-      <dd>Prisets form över dygnet. När mycket solkraft produceras mitt på dagen pressas priset ned, medan kvällen blir dyrare när solen försvinner. Kurvan liknar då en anka sedd från sidan.</dd>
+      <dd>The shape of the price over the day. When a lot of solar power is produced in the middle of the day the price is pushed down, while the evening becomes more expensive when the sun disappears. The curve then resembles a duck seen from the side.</dd>
     </dl>
 
     <ol class="notes">
-      <li id="n1"><strong>Capture rate.</strong> Beräknas som summan av pris gånger produktion dividerat med summan av produktionen, och därefter delat med snittpriset. Vind är land- plus havsbaserad vind. Produktionen är ENTSO-E:s faktiska aggregerade produktion per produktionstyp.</li>
-      <li id="n2"><strong>Spreaden är timvis.</strong> Den räknas på timmedelvärden av priset, per dygn i svensk tid, och inte på kvartspriser. Korta pristoppar och dalar jämnas därför ut, och siffrorna blir lägre än om man räknar på 15-minutersnivå. Dygn med färre än 22 timmars data räknas inte med.</li>
-      <li id="n3"><strong>Spread är inte en intäkt.</strong> Måttet visar den teoretiska skillnaden mellan dygnets högsta och lägsta pris. Den som vill tjäna på spreaden, till exempel med ett batteri, påverkas av verkningsgrad, antal cykler per dygn, effekt- och energibegränsning, nätavgifter och skillnader mellan day-ahead, intradag och reservmarknader. Utfallet blir därför lägre.</li>
-      <li id="n4"><strong>Sol och vind: täckning.</strong> Kvaliteten på rapporteringen till ENTSO-E skiljer sig mellan länder och över tid. Särskilt solproduktion i Sverige är ofullständig, eftersom mycket solel är småskalig eller sitter bakom mätaren och inte rapporteras fullt ut. Siffrorna visar den rapporterade produktionen och inte nödvändigtvis hela den faktiska produktionen. Månader där produktionsdata saknas för mer än 20 % av timmarna visas som tomma.</li>
-      <li id="n5"><strong>Upplösning.</strong> Day-ahead har haft 15 minuters upplösning sedan oktober 2025 (tidigare timpriser). Allt slås här ihop till timmedelvärden för att äldre och nyare data ska vara jämförbara. En negativ kvart inom en timme syns därför inte om timmedlet är över noll.</li>
-      <li id="n6"><strong>Vilka månader som visas.</strong> Den pågående månaden visas inte, och inte heller månader där mer än 10 % av prisdata saknas. Produktionsdata revideras i efterhand av nätbolagen, så tidigare månader kan ändras något vid nästa uppdatering.</li>
-      <li id="n7"><strong>Klockslag.</strong> Alla klockslag och dygn avser svensk tid (CET/CEST). "Kl 10–14" är timmarna 10, 11, 12 och 13, och "kl 00–04" är timmarna 00, 01, 02 och 03. Ett dag eller nattpris visas bara för månader där alla fyra timmarna finns.</li>
-      <li id="n8"><strong>Dygnsprofil.</strong> Profilen är ett genomsnitt över alla dygn i perioden, viktat efter antal dygn per månad. Sommar är april–september och vinter oktober–mars. Genomsnittet döljer variationen mellan enskilda dygn, till exempel soliga och molniga dagar.</li>
-      <li id="n9"><strong>Solparken.</strong> Produktionen är beräknad med PVGIS för 1 MWp kristallint kisel i Halmstad (56,7° N, 12,9° Ö), 30° lutning, rakt mot söder och 14 % systemförluster. Profilen kommer från ett historiskt väderår och läggs på samma datum under de senaste tolv månaderna. Den följer alltså inte det faktiska vädret. I verkligheten faller priset ofta när det är soligt, så capture rate för en verklig park blir sannolikt något lägre än här. Halmstad ligger i SE4, och övriga områden visas som hypotetiska jämförelser med samma produktionsprofil.</li>
-      <li id="n10"><strong>Batterimodellen.</strong> Batteriets effekt är lika stor som parkens toppeffekt (1 MW per MWp). Varaktigheten är 1, 2 eller 4 timmar och verkningsgraden 88 % tur och retur. Batteriet laddas bara från solparken, aldrig från nätet, och är tomt vid dygnets slut. För varje dygn väljs de laddnings- och urladdningstimmar som ger högst intäkt, med kännedom om dygnets alla day-ahead-priser i förväg. Produktionen begränsas inte, och förluster i batteriet räknas som såld energi som uteblir.</li>
-      <li id="n11"><strong>Capture price med batteri</strong> är intäkten delat med solparkens produktion, inklusive batteriförluster. Capture rate är capture price delat med områdets genomsnittspris under samma period. Beräkningen innehåller inte nätavgifter, balanskostnader, intradagshandel, stödtjänster, åldring eller investeringskostnader och ska ses som en illustration av prisvärdet i day-ahead-marknaden.</li>
-      <li id="n12"><strong>Modellen för arbitragedjup.</strong> Flottan består av identiska batterier med effekt N och varaktighet 1, 2 eller 4 timmar, verkningsgrad 88 % tur och retur, och laddar bara från nätet. Batterierna är prisundertagare med full framförhållning på dygnets day-ahead-priser, och är tomma vid dygnets slut. Priset den timmen flyttas linjärt med flottans nettoflöde (prispåverkan i euro per MWh och GW). Genom att batterierna drar upp priset när de laddar och trycker ner det när de laddar ur sjunker intäkten per MW när flottan växer. Beräkningen bygger på timpriser för var fjärde dygn de senaste 12 månaderna, uppräknat till ett år.</li>
-      <li id="n13"><strong>Begränsningar.</strong> Resultatet beror helt på prispåverkan. Modellen har en enda prisnivå per område och tar inte hänsyn till handel med grannområden som späder ut effekten, till att utbud och efterfrågan ändras över tid, eller till att batterier även säljer på intradag och stödtjänstmarknader. Den räknar inte med nätavgifter, drift, åldring eller investeringskostnader. Den visar en övre gräns för vad day-ahead-arbitrage ger, och inte vad en enskild anläggning kommer att tjäna.</li>
-      <li id="n14"><strong>Hur prispåverkan skattas.</strong> Per område görs en regression av timpris mot restlast (förbrukning minus vind och sol, i GW) de senaste 24 månaderna, med fasta effekter för månad (som fångar bränslepris och vattenläge) och för timme på dygnet uppdelat på vardag och helg. Priset begränsas till 1:a–99:e percentilen så att enstaka toppar inte styr. Standardfel är klusterrobusta per vecka. Eftersom vädret samvarierar mellan områden och områdena prissätts tillsammans körs fyra varianter: bara egen restlast, med Tyskland som kontroll, med alla andra områden som kontroll (huvudskattningen, inklusive de fem norska områdena) och samma sak på bara de senaste 12 månaderna. Banden i diagrammen spänner över de tre kontrollerade varianterna, och varianten utan kontroller visas bara som jämförelse eftersom den blir för hög.</li>
-      <li id="n15"><strong>Vad skattningen inte visar.</strong> Den mäter hur priset har rört sig vid de variationer i restlast som faktiskt förekommit, ofta några hundra MW till någon GW i ett svenskt område. En batteriflotta på flera GW ligger utanför det intervallet, och då är linjen en extrapolering. När batterierna fyller upp överföringsförbindelserna till grannområden kopplas områdena loss och priset blir känsligare, så verklig mättnad kan komma snabbare än en rak linje antyder. Sambandet påverkas också av saker som inte ingår, till exempel flöden, kärnkraftsrevisioner och vattenläge.</li>
+      <li id="n1"><strong>Capture rate.</strong> Calculated as the sum of price times production divided by the sum of production, and then divided by the average price. Wind is onshore plus offshore wind. Production is ENTSO-E's actual aggregated generation per production type.</li>
+      <li id="n2"><strong>The spread is hourly.</strong> It is calculated on hourly averages of the price, per day in Swedish time, and not on quarter-hour prices. Short price peaks and troughs are therefore smoothed out, and the figures are lower than if calculated at 15-minute level. Days with fewer than 22 hours of data are not counted.</li>
+      <li id="n3"><strong>Spread is not revenue.</strong> The measure shows the theoretical difference between the day's highest and lowest price. Anyone who wants to earn on the spread, for example with a battery, is affected by efficiency, number of cycles per day, power and energy limits, grid fees, and differences between day-ahead, intraday and reserve markets. The outcome is therefore lower.</li>
+      <li id="n4"><strong>Solar and wind: coverage.</strong> The quality of reporting to ENTSO-E differs between countries and over time. Solar production in Sweden in particular is incomplete, because much solar power is small-scale or behind the meter and is not fully reported. The figures show reported production and not necessarily the full actual production. Months where production data is missing for more than 20 % of the hours are shown as empty.</li>
+      <li id="n5"><strong>Resolution.</strong> Day-ahead has had 15-minute resolution since October 2025 (hourly prices before that). Everything is aggregated here to hourly averages so that older and newer data are comparable. A negative quarter-hour within an hour is therefore not visible if the hourly average is above zero.</li>
+      <li id="n6"><strong>Which months are shown.</strong> The current month is not shown, nor are months where more than 10 % of price data is missing. Production data is revised afterwards by the grid operators, so earlier months may change slightly at the next update.</li>
+      <li id="n7"><strong>Time of day.</strong> All times and days refer to Swedish time (CET/CEST). "10–14" means the hours 10, 11, 12 and 13, and "00–04" means the hours 00, 01, 02 and 03. A daytime or night-time price is only shown for months where all four hours are available.</li>
+      <li id="n8"><strong>Daily profile.</strong> The profile is an average over all days in the period, weighted by the number of days per month. Summer is April–September and winter October–March. The average hides the variation between individual days, for example sunny and cloudy days.</li>
+      <li id="n9"><strong>The solar park.</strong> Production is calculated with PVGIS for 1 MWp of crystalline silicon in Halmstad (56.7° N, 12.9° E), 30° tilt, facing due south and 14 % system losses. The profile comes from a historical weather year and is placed on the same dates over the last twelve months. It therefore does not follow the actual weather. In reality the price often falls when it is sunny, so the capture rate for a real park is likely somewhat lower than here. Halmstad is in SE4, and the other zones are shown as hypothetical comparisons with the same production profile.</li>
+      <li id="n10"><strong>The battery model.</strong> The battery's power equals the park's peak power (1 MW per MWp). Duration is 1, 2 or 4 hours and round-trip efficiency 88 %. The battery is charged only from the solar park, never from the grid, and is empty at the end of the day. For each day the charging and discharging hours that give the highest revenue are chosen, with knowledge of all the day's day-ahead prices in advance. Production is not curtailed, and losses in the battery count as sold energy that does not materialise.</li>
+      <li id="n11"><strong>Capture price with battery</strong> is revenue divided by the solar park's production, including battery losses. Capture rate is capture price divided by the zone's average price over the same period. The calculation does not include grid fees, balancing costs, intraday trading, ancillary services, degradation or investment costs and should be seen as an illustration of the price value in the day-ahead market.</li>
+      <li id="n12"><strong>The arbitrage depth model.</strong> The fleet consists of identical batteries with power N and duration 1, 2 or 4 hours, 88 % round-trip efficiency, and charges only from the grid. The batteries are price takers with perfect foresight of the day's day-ahead prices, and are empty at the end of the day. The price in that hour is shifted linearly with the fleet's net flow (price impact in euro per MWh and GW). Because the batteries push the price up when they charge and down when they discharge, revenue per MW falls as the fleet grows. The calculation is based on hourly prices for every fourth day over the last 12 months, scaled up to a year.</li>
+      <li id="n13"><strong>Limitations.</strong> The result depends entirely on the price impact. The model has a single price level per zone and does not account for trade with neighbouring zones that dilutes the effect, for supply and demand changing over time, or for batteries also selling in intraday and ancillary service markets. It does not include grid fees, operations, degradation or investment costs. It shows an upper limit for what day-ahead arbitrage yields, and not what an individual installation will earn.</li>
+      <li id="n14"><strong>How price impact is estimated.</strong> For each zone a regression of hourly price on residual load (consumption minus wind and solar, in GW) is run over the last 24 months, with fixed effects for month (which captures fuel prices and hydrology) and for hour of day split into weekdays and weekends. Prices are capped at the 1st–99th percentile so that single spikes do not dominate. Standard errors are cluster-robust by week. Because weather co-varies between zones and the zones are priced together, four variants are run: own residual load only, with Germany as a control, with all other zones as controls (the main estimate, including the five Norwegian zones), and the same on only the latest 12 months. The bands in the charts span the three controlled variants, and the variant without controls is shown only for comparison because it comes out too high.</li>
+      <li id="n15"><strong>What the estimate does not show.</strong> It measures how the price has moved given the variations in residual load that have actually occurred, often a few hundred MW up to about a GW in a Swedish zone. A battery fleet of several GW lies outside that range, and the line is then an extrapolation. When the batteries fill up the interconnectors to neighbouring zones, the zones decouple and the price becomes more sensitive, so real saturation may come faster than a straight line suggests. The relationship is also affected by things that are not included, for example flows, nuclear outages and hydrology.</li>
+      <li id="n16"><strong>Consumption.</strong> ENTSO-E's reported actual total load per bidding zone, aggregated to hourly values and summed over twelve months. Months with fewer than 90 % of the hours reported are left out, so a rolling 12-month figure requires twelve complete months. The grid operators may revise the data afterwards.</li>
     </ol>
 
-    <p class="disclaimer">Informationen är endast avsedd som underlag och utgör inte investerings- eller rådgivning. Data kan innehålla fel eller luckor. Valuta: euro.</p>
+    <p class="disclaimer">The information is intended as background only and does not constitute investment advice or any other advice. Data may contain errors or gaps. Currency: euro.</p>
   </section>
 
-  <footer>Källa: <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a>. Senast uppdaterad: <span id="updated">–</span>. Bouncy Energy.</footer>
+  <footer>Source: <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a>. Last updated: <span id="updated">–</span>. Bouncy Energy.</footer>
 </div>
 
 <script>
 (function () {
   'use strict';
 
-  var MON = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
-  var state = { zone: 'SE3', tab: 'capture', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', depthDur: '2h', depthS: 15, depthMax: 10, depthMode: 'est' };
+  var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var state = { zone: 'SE3', tab: 'overview', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', depthDur: '2h', depthS: 15, depthMax: 10, depthMode: 'est' };
   var DATA = null, RECENT = null;
 
   var qs = new URLSearchParams(location.search);
   if (qs.get('zone')) state.zone = qs.get('zone').toUpperCase();
-  if (['capture', 'duck', 'solar', 'depth', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
+  if (['overview', 'capture', 'duck', 'solar', 'depth', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
 
   function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   function $(id) { return document.getElementById(id); }
   function fmt(v, d) {
-    return v == null ? '–' : Number(v).toLocaleString('sv-SE', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
+    return v == null ? '–' : Number(v).toLocaleString('en-GB', { minimumFractionDigits: d || 0, maximumFractionDigits: d || 0 });
   }
   function label(m) { return MON[parseInt(m.slice(5, 7), 10) - 1] + ' ' + m.slice(2, 4); }
   function tail(arr, n) { return n ? arr.slice(-n) : arr.slice(); }
@@ -598,9 +660,9 @@
     var sp = lastValue(z.spread.spread_mean);
     var lastMonth = label(z.months[z.months.length - 1]);
     $('kpis').innerHTML =
-      '<div class="kpi wind"><dt>Vind, rullande 12 mån</dt><dd>' + (wr == null ? '–' : fmt(wr * 100) + ' %') + '</dd></div>' +
-      '<div class="kpi solar"><dt>Sol, rullande 12 mån</dt><dd>' + (sr == null ? '–' : fmt(sr * 100) + ' %') + '</dd></div>' +
-      '<div class="kpi spread"><dt>Medelspread per dygn, ' + lastMonth + '</dt><dd>' + fmt(sp) + ' <small>€/MWh</small></dd></div>';
+      '<div class="kpi wind"><dt>Wind, rolling 12 mo</dt><dd>' + (wr == null ? '–' : fmt(wr * 100) + ' %') + '</dd></div>' +
+      '<div class="kpi solar"><dt>Solar, rolling 12 mo</dt><dd>' + (sr == null ? '–' : fmt(sr * 100) + ' %') + '</dd></div>' +
+      '<div class="kpi spread"><dt>Average daily spread, ' + lastMonth + '</dt><dd>' + fmt(sp) + ' <small>€/MWh</small></dd></div>';
   }
 
   /* ---------- Gemensam y-axel för alla områden ---------- */
@@ -636,7 +698,7 @@
   /* ---------- Flik: Capture rate ---------- */
   function renderCapture() {
     var tech = state.tech, rolling = state.view === 'rolling';
-    var techName = tech === 'wind' ? 'vind' : 'sol';
+    var techName = tech === 'wind' ? 'wind' : 'solar';
     var xs = tail(ALLM, state.range).map(label);
     var rateBy = {}, priceBy = {}, baseBy = {};
     DATA.order.forEach(function (k) {
@@ -650,9 +712,9 @@
     var rateRange = niceRange(extentOf(rateLists), true, 110);
     var priceRange = niceRange(extentOf(priceLists), true);
     var mode = rolling ? 'lines' : 'lines+markers';
-    var suffix = rolling ? ', rullande 12 månader' : ' per månad';
+    var suffix = rolling ? ', rolling 12 months' : ' per month';
     var none = !selectedZones().length;
-    $('note-nozones-c').textContent = none ? 'Välj minst ett elområde i panelen ovan.' : '';
+    $('note-nozones-c').textContent = none ? 'Select at least one bidding zone in the panel above.' : '';
 
     Plotly.react('chart-rate', zoneTraces({ cur: rateBy, prior: null }, xs, '%{y:.0f} %', '', mode), layout(xs, {
       yaxis: yAxis({ ticksuffix: ' %' }, rateRange),
@@ -660,15 +722,15 @@
     }), CONFIG);
     $('rate-title').textContent = 'Capture rate, ' + techName + suffix;
 
-    Plotly.react('chart-price', zoneTraces({ cur: priceBy, prior: state.showBase ? baseBy : null }, xs, '%{y:.1f} €/MWh', 'snittpris', mode),
+    Plotly.react('chart-price', zoneTraces({ cur: priceBy, prior: state.showBase ? baseBy : null }, xs, '%{y:.1f} €/MWh', 'average price', mode),
       layout(xs, { yaxis: yAxis({ zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €' }, priceRange) }), CONFIG);
     $('price-title').textContent = 'Capture price, ' + techName + suffix;
 
     var notes = [];
     var missing = selectedZones().filter(function (k) { return allNull(rateBy[k]); });
-    if (missing.length) notes.push('Ingen ' + (tech === 'wind' ? 'vindproduktion' : 'solproduktion') + ' rapporterad (eller för ofullständig) i ENTSO-E för: ' + missing.join(', ') + '.');
-    if (tech === 'solar' && !missing.length) notes.push('Solproduktion i Sverige är ofullständigt rapporterad i ENTSO-E, så Danmark, Finland och Tyskland är bättre referens.');
-    if (rolling) notes.push('Rullande 12 månader kräver tolv månader med data i följd, så linjerna börjar först efter ett års historik.');
+    if (missing.length) notes.push('No ' + (tech === 'wind' ? 'wind' : 'solar') + ' production reported (or too incomplete) in ENTSO-E for: ' + missing.join(', ') + '.');
+    if (tech === 'solar' && !missing.length) notes.push('Solar production in Sweden is incompletely reported in ENTSO-E, so Denmark, Finland and Germany are better references.');
+    if (rolling) notes.push('Rolling 12 months requires twelve consecutive months of data, so the lines only start after a year of history.');
     $('note-rate').textContent = notes.join(' ');
     $('note-rate').className = 'note' + (missing.length ? ' alert' : '');
   }
@@ -773,7 +835,7 @@
       var c = ZONE_COLORS[k] || '#888';
       out.push({ type: 'scatter', mode: mode || 'lines', name: k, legendgroup: k, x: xs, y: ts.cur[k], connectgaps: false,
                  line: { color: c, width: 2.8 }, marker: { size: 5 }, hovertemplate: hover });
-      if (ts.prior) out.push({ type: 'scatter', mode: 'lines', name: k + ' (' + (priorLabel == null ? '12 mån tidigare' : priorLabel) + ')', legendgroup: k, showlegend: false, x: xs, y: ts.prior[k], connectgaps: false,
+      if (ts.prior) out.push({ type: 'scatter', mode: 'lines', name: k + ' (' + (priorLabel == null ? '12 mo earlier' : priorLabel) + ')', legendgroup: k, showlegend: false, x: xs, y: ts.prior[k], connectgaps: false,
                  opacity: 0.8, line: { color: c, width: 2, dash: 'dot' }, hovertemplate: hover });
     });
     return out;
@@ -781,10 +843,10 @@
 
   function renderDuck() {
     if (!DATA.order.some(function (k) { return DATA.zones[k].hp; })) {
-      $('note-profile').textContent = 'Den här fliken behöver nyare data. Ladda upp den nya update_data.py till GitHub och kör flödet igen.';
+      $('note-profile').textContent = 'This tab needs newer data. Upload the new update_data.py to GitHub and run the workflow again.';
       return;
     }
-    $('note-nozones').textContent = selectedZones().length ? '' : 'Välj minst ett elområde i panelen ovan.';
+    $('note-nozones').textContent = selectedZones().length ? '' : 'Select at least one bidding zone in the panel above.';
 
     var last12 = ALLM.slice(-12);
     var prev12 = ALLM.length >= 24 ? ALLM.slice(-24, -12) : [];
@@ -800,18 +862,18 @@
       if (prev12.length) acc.push(profileFor(zz, prev12, state.profile));
       return acc;
     }, [])), true);
-    var seasonText = { all: 'hela året', sum: 'sommar (apr–sep)', win: 'vinter (okt–mar)' }[state.profile];
+    var seasonText = { all: 'whole year', sum: 'summer (Apr–Sep)', win: 'winter (Oct–Mar)' }[state.profile];
     var ptr = [];
     selectedZones().forEach(function (k) {
       var zz = DATA.zones[k], c = ZONE_COLORS[k] || '#888';
       ptr.push({ name: k, legendgroup: k, x: hours, y: profileFor(zz, last12, state.profile), mode: 'lines+markers',
                  line: { color: c, width: 3 }, marker: { size: 4 }, hovertemplate: '%{y:.1f} €/MWh' });
-      if (prev12.length) ptr.push({ name: k + ' (månad 13–24)', legendgroup: k, showlegend: false, x: hours, y: profileFor(zz, prev12, state.profile), mode: 'lines',
+      if (prev12.length) ptr.push({ name: k + ' (months 13–24)', legendgroup: k, showlegend: false, x: hours, y: profileFor(zz, prev12, state.profile), mode: 'lines',
                  opacity: 0.8, line: { color: c, width: 2, dash: 'dot' }, hovertemplate: '%{y:.1f} €/MWh' });
     });
     Plotly.react('chart-profile', ptr, layout(hours, { yaxis: yAxis({ ticksuffix: ' €' }, profRange) }), CONFIG);
-    $('profile-title').textContent = 'Dygnsprofil, ' + seasonText;
-    $('note-profile').textContent = 'Klockslag (svensk tid) på x-axeln. Heldragen linje = senaste 12 mån (' + rng(last12) + ')' + (prev12.length ? ', streckad = månad 13–24 (' + rng(prev12) + ')' : '') + '.';
+    $('profile-title').textContent = 'Daily profile, ' + seasonText;
+    $('note-profile').textContent = 'Hour of day (Swedish time) on the x-axis. Solid line = latest 12 months (' + rng(last12) + ')' + (prev12.length ? ', dashed = months 13–24 (' + rng(prev12) + ')' : '') + '.';
 
     /* 2. Andel negativa priser (alla områden, oberoende av panelen) */
     var a = DATA.order.map(function (k) { return windowShare(DATA.zones[k], last12); });
@@ -819,10 +881,10 @@
     var ext = extentOf([a, b]);
     var negRange = ext ? niceRange([0, ext[1] * 1.15], true) : null;
     var txt = function (arr) { return arr.map(function (v) { return v == null ? '' : fmt(v, 1) + ' %'; }); };
-    var bars = [{ type: 'bar', name: 'Senaste 12 mån', x: DATA.order, y: a, marker: { color: css('--ink') }, text: txt(a), textposition: 'outside', cliponaxis: false, hovertemplate: '%{y:.1f} % av timmarna' }];
-    if (prev12.length) bars.push({ type: 'bar', name: 'Månad 13–24', x: DATA.order, y: b, marker: { color: '#a5b8c0' }, text: txt(b), textposition: 'outside', cliponaxis: false, hovertemplate: '%{y:.1f} % av timmarna' });
+    var bars = [{ type: 'bar', name: 'Latest 12 mo', x: DATA.order, y: a, marker: { color: css('--ink') }, text: txt(a), textposition: 'outside', cliponaxis: false, hovertemplate: '%{y:.1f} % of hours' }];
+    if (prev12.length) bars.push({ type: 'bar', name: 'Months 13–24', x: DATA.order, y: b, marker: { color: '#a5b8c0' }, text: txt(b), textposition: 'outside', cliponaxis: false, hovertemplate: '%{y:.1f} % of hours' });
     Plotly.react('chart-negshare', bars, layout(DATA.order, { barmode: 'group', bargap: 0.3, yaxis: yAxis({ ticksuffix: ' %' }, negRange) }), CONFIG);
-    $('negshare-sub').textContent = 'Andel av timmarna med negativt pris, alla områden oavsett val ovan. Senaste 12 mån = ' + rng(last12) + (prev12.length ? ', månad 13–24 = ' + rng(prev12) : '') + '.';
+    $('negshare-sub').textContent = 'Share of hours with a negative price, all zones regardless of the selection above. Latest 12 mo = ' + rng(last12) + (prev12.length ? ', months 13–24 = ' + rng(prev12) : '') + '.';
 
     /* 3. Dygnsspread */
     var win = state.dview === 'rolling' ? 12 : 0;
@@ -833,9 +895,9 @@
       win);
     Plotly.react('chart-spreadtrend', zoneTraces(sp, xs, '%{y:.0f} €/MWh'),
       layout(xs, { yaxis: yAxis({ ticksuffix: ' €' }, niceRange(extentOf(allLists(sp)), true)) }), CONFIG);
-    $('spreadtrend-title').textContent = win ? 'Dygnsspread, rullande 12 månader' : 'Dygnsspread per månad';
+    $('spreadtrend-title').textContent = win ? 'Daily spread, rolling 12 months' : 'Daily spread per month';
     $('note-spreadtrend').textContent = win
-      ? 'Rullande 12 månader är ett medelvärde över alla dygn de senaste tolv månaderna och kräver ett års historik, så linjerna börjar först då. Streckad linje visar samma mått tolv månader tidigare (månad 13–24).'
+      ? 'Rolling 12 months is an average over all days in the last twelve months and requires a year of history, so the lines only start then. The dashed line shows the same measure twelve months earlier (months 13–24).'
       : '';
 
     /* 4 + 5. Dag- och nattpris, samma beräkningssätt och skala */
@@ -845,23 +907,23 @@
     var night = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 0, 4), ALLM); }, monthDays, dnWin);
     var dnRange = niceRange(extentOf(allLists(day).concat(allLists(night))), true);
     var dnLayout = function () { return layout(xs, { yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }, dnRange) }); };
-    var dnPrior = dnWin === 6 ? 'samma period ett år tidigare' : '12 mån tidigare';
+    var dnPrior = dnWin === 6 ? 'same period a year earlier' : '12 mo earlier';
     Plotly.react('chart-day', zoneTraces(day, xs, '%{y:.1f} €/MWh', dnPrior), dnLayout(), CONFIG);
     Plotly.react('chart-night', zoneTraces(night, xs, '%{y:.1f} €/MWh', dnPrior), dnLayout(), CONFIG);
-    var dnText = dnWin ? ', rullande ' + dnWin + ' månader' : ' per månad';
-    $('day-title').textContent = 'Dagpris kl 10–14' + dnText;
-    $('night-title').textContent = 'Nattpris kl 00–04' + dnText;
+    var dnText = dnWin ? ', rolling ' + dnWin + ' months' : ' per month';
+    $('day-title').textContent = 'Daytime price 10:00–14:00' + dnText;
+    $('night-title').textContent = 'Night-time price 00:00–04:00' + dnText;
     $('note-dn').textContent = dnWin === 12
-      ? 'Rullande 12 månader är ett medelvärde över de senaste tolv månaderna, viktat efter antal dygn. Streckad linje visar samma mått tolv månader tidigare (månad 13–24).'
+      ? 'Rolling 12 months is an average over the latest twelve months, weighted by the number of days. The dashed line shows the same measure twelve months earlier (months 13–24).'
       : dnWin === 6
-        ? 'Rullande 6 månader är ett medelvärde över de senaste sex månaderna, viktat efter antal dygn. Streckad linje visar samma sexmånadersperiod ett år tidigare. Linjerna börjar efter sex månaders historik, och de streckade efter arton.'
+        ? 'Rolling 6 months is an average over the latest six months, weighted by the number of days. The dashed line shows the same six-month period a year earlier. The lines start after six months of history, and the dashed ones after eighteen.'
         : '';
   }
 
   /* ---------- Flik: Solpark + BESS ---------- */
   var SOLAR = null;
   var SC = ['none', '1h', '2h', '4h'];
-  var SC_NAME = { none: 'Utan BESS', '1h': '1 h BESS', '2h': '2 h BESS', '4h': '4 h BESS' };
+  var SC_NAME = { none: 'Without BESS', '1h': '1 h BESS', '2h': '2 h BESS', '4h': '4 h BESS' };
   var SC_COLOR = { none: '#b8c4c9', '1h': '#6fa8bd', '2h': '#2f7a97', '4h': '#13242d' };
 
   function solarExtent(field, scale) {
@@ -875,18 +937,18 @@
   function renderSolar() {
     var note = $('note-solar');
     if (!SOLAR) {
-      note.textContent = 'Den här fliken behöver nyare data. Ladda upp den nya update_data.py och requirements.txt till GitHub och kör flödet igen.';
+      note.textContent = 'This tab needs newer data. Upload the new update_data.py and requirements.txt to GitHub and run the workflow again.';
       return;
     }
     var site = SOLAR.site, win = site.window;
-    $('solar-intro').textContent = 'Fiktiv solpark på 1 MWp i ' + site.name + ' (' + site.tilt + '° lutning, rakt mot söder, produktionsprofil från PVGIS, väderår ' + site.year + '). Priser: day-ahead, de senaste 12 månaderna (' + label(win[0]) + '–' + label(win[win.length - 1]) + '). Batteriet laddas bara från solparken och flyttar varje dygn produktion från de billigaste till de dyraste timmarna. Effekt ' + fmt(site.bess_power_mw_per_mwp, 1) + ' MW per MWp och verkningsgrad ' + fmt(site.rte * 100) + ' % tur och retur.';
-    if (site.annual_kwh_per_kwp) $('solar-intro').textContent += ' Profilens årsproduktion är ' + fmt(site.annual_kwh_per_kwp) + ' kWh per kWp, som du kan jämföra med PVGIS webbverktyg för samma inställningar.';
+    $('solar-intro').textContent = 'Fictional 1 MWp solar park in ' + site.name + ' (' + site.tilt + '° tilt, facing due south, production profile from PVGIS, weather year ' + site.year + '). Prices: day-ahead, the last 12 months (' + label(win[0]) + '–' + label(win[win.length - 1]) + '). The battery is charged only from the solar park and shifts production each day from the cheapest to the most expensive hours. Power ' + fmt(site.bess_power_mw_per_mwp, 1) + ' MW per MWp and ' + fmt(site.rte * 100) + ' % round-trip efficiency.';
+    if (site.annual_kwh_per_kwp) $('solar-intro').textContent += ' The annual production of the profile is ' + fmt(site.annual_kwh_per_kwp) + ' kWh per kWp, which you can compare with the PVGIS web tool for the same settings.';
     var zones = selectedZones().filter(function (k) { return SOLAR.zones[k]; });
-    note.textContent = zones.length ? '' : 'Välj minst ett elområde i panelen ovan.';
+    note.textContent = zones.length ? '' : 'Select at least one bidding zone in the panel above.';
     note.className = 'note alert';
 
     /* 1 + 2. Stapeldiagram per område */
-    var xl = zones.map(function (k) { return k + '<br>snitt ' + fmt(SOLAR.zones[k].base) + ' €'; });
+    var xl = zones.map(function (k) { return k + '<br>avg ' + fmt(SOLAR.zones[k].base) + ' €'; });
     function bars(field, scale, texter, hover) {
       return SC.map(function (sc) {
         var y = zones.map(function (k) { var v = SOLAR.zones[k].total[sc][field]; return v == null ? null : v * scale; });
@@ -903,7 +965,7 @@
       layout(xl, { barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' €' }, priceRange) }), CONFIG);
 
     /* 3. Nyckeltal */
-    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Scenario</th><th>Capture price</th><th>Capture rate</th><th>Höjning</th><th>Via batteriet</th><th>Cykler</th></tr></thead><tbody>';
+    var html = '<table class="data-table"><thead><tr><th>Zone</th><th>Scenario</th><th>Capture price</th><th>Capture rate</th><th>Uplift</th><th>Via battery</th><th>Cycles</th></tr></thead><tbody>';
     zones.forEach(function (k) {
       var t = SOLAR.zones[k].total, base = t.none.cp;
       SC.forEach(function (sc, i) {
@@ -933,7 +995,7 @@
                line: { color: SC_COLOR[sc], width: sc === 'none' ? 2.2 : 2.8, dash: sc === 'none' ? 'dot' : 'solid' }, marker: { size: 5 }, hovertemplate: '%{y:.0f} %' };
     }), layout(mx, { yaxis: yAxis({ ticksuffix: ' %' }, mRange),
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }] }), CONFIG);
-    $('solar-monthly-title').textContent = 'Månad för månad, ' + zs.name;
+    $('solar-monthly-title').textContent = 'Month by month, ' + zs.name;
 
     var ex = zs.examples || [];
     if (!ex.length) { return; }
@@ -948,19 +1010,20 @@
     var ymax = Math.max.apply(null, e.pv.concat(out)) * 1.12 || 1;
     var pmin = Math.min(0, Math.min.apply(null, e.p)), pmax = Math.max.apply(null, e.p) * 1.12 || 1;
     Plotly.react('chart-solar-day', [
-      { type: 'scatter', mode: 'lines', name: 'Solproduktion', x: hours, y: e.pv, line: { color: css('--solar'), width: 1, shape: 'hv' }, fill: 'tozeroy', fillcolor: 'rgba(226,154,14,0.40)', hovertemplate: '%{y:.2f} MW' },
-      { type: 'scatter', mode: 'lines', name: 'Levererat efter ' + SC_NAME[state.solScn].replace(' BESS', ' batteri'), x: hours, y: out, line: { color: SC_COLOR['4h'], width: 2.6, shape: 'hv' }, hovertemplate: '%{y:.2f} MW' },
-      { type: 'scatter', mode: 'lines', name: 'Pris (höger axel)', x: hours, y: e.p, yaxis: 'y2', line: { color: css('--wind'), width: 2, dash: 'dot', shape: 'hv' }, hovertemplate: '%{y:.0f} €/MWh' }
+      { type: 'scatter', mode: 'lines', name: 'Solar production', x: hours, y: e.pv, line: { color: css('--solar'), width: 1, shape: 'hv' }, fill: 'tozeroy', fillcolor: 'rgba(226,154,14,0.40)', hovertemplate: '%{y:.2f} MW' },
+      { type: 'scatter', mode: 'lines', name: 'Delivered after ' + SC_NAME[state.solScn].replace(' BESS', ' battery'), x: hours, y: out, line: { color: SC_COLOR['4h'], width: 2.6, shape: 'hv' }, hovertemplate: '%{y:.2f} MW' },
+      { type: 'scatter', mode: 'lines', name: 'Price (right axis)', x: hours, y: e.p, yaxis: 'y2', line: { color: css('--wind'), width: 2, dash: 'dot', shape: 'hv' }, hovertemplate: '%{y:.0f} €/MWh' }
     ], layout(hours, {
       margin: { l: 52, r: 56, t: 10, b: 44 },
       yaxis: yAxis({ ticksuffix: ' MW' }, [0, ymax]),
       yaxis2: { overlaying: 'y', side: 'right', range: [pmin, pmax], ticksuffix: ' €', showgrid: false, zeroline: false, fixedrange: true }
     }), CONFIG);
-    $('solar-day-title').textContent = 'Exempeldag ' + e.date + ', ' + zs.name;
+    $('solar-day-title').textContent = 'Example day ' + e.date + ', ' + zs.name;
   }
 
   /* ---------- Flik: Arbitragedjup ---------- */
   var DEPTH = null, SLOPE = null;
+  var DP_EN = { natt: 'Night', morgon: 'Morning', dag: 'Midday', 'kväll': 'Evening', night: 'Night', morning: 'Morning', day: 'Midday', evening: 'Evening' };
 
   function interpK(xs, ys, x) {
     if (x <= xs[0]) return ys[0];
@@ -1005,20 +1068,20 @@
   function renderDepth() {
     var note = $('note-depth');
     if (!DEPTH) {
-      note.textContent = 'Den här fliken behöver nyare data. Ladda upp den nya update_data.py till GitHub och kör flödet igen. Beräkningen tar ett tag första gången.';
+      note.textContent = 'This tab needs newer data. Upload the new update_data.py to GitHub and run the workflow again. The calculation takes a while the first time.';
       return;
     }
     var zones = selectedZones().filter(function (k) { return DEPTH.zones[k]; });
-    note.textContent = zones.length ? '' : 'Välj minst ett elområde i panelen ovan.';
+    note.textContent = zones.length ? '' : 'Select at least one bidding zone in the panel above.';
     var est = state.depthMode === 'est' && !!SLOPE;
     var s = state.depthS, maxN = state.depthMax, dur = state.depthDur;
     $('rng-depth').value = String(s);
     $('rng-depth').disabled = est;
-    $('depth-s-label').textContent = est ? 'skattad per område' : fmt(s, 1) + ' €/MWh per GW';
+    $('depth-s-label').textContent = est ? 'estimated per zone' : fmt(s, 1) + ' €/MWh per GW';
     $('depth-help').textContent = est
-      ? 'Prispåverkan är skattad per område från historisk last, vind, sol och pris (se Empiriskt underlag längre ned). Det skuggade bandet är 95 %-intervallet. Skattningen bygger på variationer i restlast av begränsad storlek, så stora flottor är en extrapolering.'
-      : 'Prispåverkan är hur många euro per megawattimme priset flyttar när en flotta på 1 GW laddar eller laddar ur med full effekt. Lågt värde är en djup marknad som tål många batterier, och högt värde en grund marknad som mättas fort. Förinställningarna är lägsta, mittersta och högsta skattade värdet bland områdena. Kurvans form går att lita mer på än det exakta GW-talet.';
-    if (!SLOPE) $('depth-est-note').textContent = 'Skattningen saknas ännu (den kräver att förbrukning hämtas från ENTSO-E). Kör flödet igen, så visas den. Tills dess gäller reglaget.';
+      ? 'Price impact is estimated per zone from historical load, wind, solar and price (see Empirical basis further down). The shaded band spans the model variants (95 % intervals). The estimate is based on variations in residual load of limited size, so large fleets are an extrapolation.'
+      : 'Price impact is how many euro per megawatt-hour the price moves when a 1 GW fleet charges or discharges at full power. A low value is a deep market that can take many batteries, and a high value is a shallow market that saturates quickly. The presets are the lowest, middle and highest estimated values among the zones. The shape of the curve is more reliable than the exact GW figure.';
+    if (!SLOPE) $('depth-est-note').textContent = 'The estimate is not available yet (it requires consumption data from ENTSO-E). Run the workflow again and it will appear. Until then the slider applies.';
     else $('depth-est-note').textContent = '';
 
     if (SLOPE) {
@@ -1026,7 +1089,7 @@
       if (cs.length) {
         var med = cs.length % 2 ? cs[(cs.length - 1) / 2] : (cs[cs.length / 2 - 1] + cs[cs.length / 2]) / 2;
         var setPre = function (id, v, t) { var b = $(id); b.dataset.dpre = String(Math.round(v * 2) / 2); b.textContent = t + ' (' + fmt(v, 1) + ')'; };
-        setPre('pre-low', cs[0], 'Lägst'); setPre('pre-mid', med, 'Median'); setPre('pre-high', cs[cs.length - 1], 'Högst');
+        setPre('pre-low', cs[0], 'Lowest'); setPre('pre-mid', med, 'Median'); setPre('pre-high', cs[cs.length - 1], 'Highest');
       }
     }
     var grid = [];
@@ -1049,11 +1112,11 @@
       }
       revTr.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: grid, y: depthCurve(k, 'rev', sc, grid), line: { color: c, width: 2.8 }, hovertemplate: '%{y:.0f} k€/MW' });
       var n50 = saturationAt(k, sc, 0.5);
-      if (n50 != null && n50 <= maxN) revTr.push({ type: 'scatter', mode: 'markers', name: k + ' (halverad)', legendgroup: k, showlegend: false, x: [n50], y: [zz.res[dur].rev[0] * 0.5],
-        marker: { symbol: 'diamond', size: 11, color: c, line: { color: css('--ink'), width: 1.5 } }, hovertemplate: 'Halverad intäkt vid %{x:.1f} GW<extra>' + k + '</extra>' });
+      if (n50 != null && n50 <= maxN) revTr.push({ type: 'scatter', mode: 'markers', name: k + ' (halved)', legendgroup: k, showlegend: false, x: [n50], y: [zz.res[dur].rev[0] * 0.5],
+        marker: { symbol: 'diamond', size: 11, color: c, line: { color: css('--ink'), width: 1.5 } }, hovertemplate: 'Revenue halved at %{x:.1f} GW<extra>' + k + '</extra>' });
       sprTr.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: grid, y: depthCurve(k, 'spread', sc, grid), line: { color: c, width: 2.8 }, hovertemplate: '%{y:.0f} €/MWh' });
     });
-    if (noEst.length) $('depth-est-note').textContent = 'Skattning saknas för ' + noEst.join(', ') + ', där reglaget (' + fmt(s, 1) + ' €/MWh per GW) används i stället.';
+    if (noEst.length) $('depth-est-note').textContent = 'No estimate for ' + noEst.join(', ') + ', where the slider (' + fmt(s, 1) + ' €/MWh per GW) is used instead.';
     Plotly.react('chart-depth-rev', revTr, layout(grid, { xaxis: xaxis, hovermode: 'x unified', yaxis: yAxis({ ticksuffix: ' k€' }, niceRange([0, rev0Max * 1.06], true)) }), CONFIG);
     Plotly.react('chart-depth-spread', sprTr, layout(grid, { xaxis: xaxis, hovermode: 'x unified', yaxis: yAxis({ ticksuffix: ' €' }, niceRange([0, spr0Max * 1.06], true)) }), CONFIG);
 
@@ -1065,38 +1128,38 @@
       if (!u.sl) return gw(c, u.c) + ' GW';
       return gw(c, u.c) + ' GW <span style="color:var(--muted)">(' + gw(saturationAt(k, u.hi, f), u.hi) + '–' + gw(saturationAt(k, u.lo, f), u.lo) + ')</span>';
     };
-    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Prispåverkan</th><th>Första MW (k€/år)</th><th>Dygnsspread idag</th><th>75 % kvar</th><th>50 % kvar</th><th>25 % kvar</th></tr></thead><tbody>';
+    var html = '<table class="data-table"><thead><tr><th>Zone</th><th>Price impact</th><th>First MW (k€/yr)</th><th>Daily spread today</th><th>75 % left</th><th>50 % left</th><th>25 % left</th></tr></thead><tbody>';
     zones.forEach(function (k) {
       var zz = DEPTH.zones[k], u = used[k];
       html += '<tr><td><strong>' + k + '</strong></td><td>' + fmt(u.c, 1) + (u.sl ? ' <span style="color:var(--muted)">(' + fmt(u.lo, 1) + '–' + fmt(u.hi, 1) + ')</span>' : '') + '</td><td>' + fmt(zz.res[dur].rev[0]) + '</td><td>' + fmt(zz.spread0) + ' €</td><td>' + cell(k, 0.75) + '</td><td>' + cell(k, 0.5) + '</td><td>' + cell(k, 0.25) + '</td></tr>';
     });
     $('depth-table').innerHTML = html + '</tbody></table>';
-    $('note-depth-ref').textContent = 'Parentes visar 95 %-intervallet för prispåverkan, och därmed för mättnadspunkten. Som sammanhang: enligt Aurora Energy Research passerade Sverige 1 GW batterier i drift under första kvartalet 2025, med 2,8 GW som mål till 2028. Mycket av den kapaciteten säljer stödtjänster och inte arbitrage, och kapaciteten fördelas på flera elområden.';
+    $('note-depth-ref').textContent = 'Parentheses show the range of the price-impact estimate across model variants, and hence the range for the saturation point. For context: according to Aurora Energy Research, Sweden passed 1 GW of batteries in operation in the first quarter of 2025, with 2.8 GW as the target for 2028. Much of that capacity sells ancillary services rather than arbitrage, and the capacity is spread over several bidding zones.';
 
     renderSlopeEvidence(zones);
   }
 
   function renderSlopeEvidence(zones) {
     var tbl = $('slope-table'), nt = $('note-slope');
-    if (!SLOPE) { tbl.innerHTML = ''; nt.textContent = 'Underlaget saknas ännu. Kör flödet igen efter att ha laddat upp den nya update_data.py.'; return; }
+    if (!SLOPE) { tbl.innerHTML = ''; nt.textContent = 'The evidence is not available yet. Run the workflow again after uploading the new update_data.py.'; return; }
     var fz = zones.filter(function (k) { return SLOPE.zones[k]; });
     var f = function (o) { return o ? fmt(o.b, 1) + ' <span style="color:var(--muted)">(' + fmt(o.lo, 1) + '–' + fmt(o.hi, 1) + ')</span>' : '–'; };
-    var html = '<table class="data-table"><thead><tr><th>Område</th><th>Huvudskattning</th><th>Spann mellan modellvarianter</th><th>Bara egen restlast</th><th>Kontroll för Tyskland</th><th>Kontroll för alla områden</th><th>Observerad restlast (5–95 %)</th><th>Timmar</th></tr></thead><tbody>';
+    var html = '<table class="data-table"><thead><tr><th>Zone</th><th>Main estimate</th><th>Range across model variants</th><th>Own residual load only</th><th>Controlling for Germany</th><th>Controlling for all zones</th><th>Observed residual load (5–95 %)</th><th>Hours</th></tr></thead><tbody>';
     fz.forEach(function (k) {
       var e = SLOPE.zones[k], c = e[e.central], bd = e.band || { lo: c.lo, hi: c.hi };
-      html += '<tr><td><strong>' + k + '</strong></td><td>' + f(c) + '</td><td>' + fmt(bd.lo, 1) + '–' + fmt(bd.hi, 1) + (bd.lo <= 0 ? ' *' : '') + '</td><td>' + f(e.a) + '</td><td>' + (e.b ? f(e.b) : 'egen referens') + '</td><td>' + (e.c ? f(e.c) : '–') + '</td><td>' + fmt(e.rl_range[0], 1) + ' till +' + fmt(e.rl_range[1], 1) + ' GW</td><td>' + fmt(e.n) + '</td></tr>';
+      html += '<tr><td><strong>' + k + '</strong></td><td>' + f(c) + '</td><td>' + fmt(bd.lo, 1) + '–' + fmt(bd.hi, 1) + (bd.lo <= 0 ? ' *' : '') + '</td><td>' + f(e.a) + '</td><td>' + (e.b ? f(e.b) : 'own reference') + '</td><td>' + (e.c ? f(e.c) : '–') + '</td><td>' + fmt(e.rl_range[0], 1) + ' to +' + fmt(e.rl_range[1], 1) + ' GW</td><td>' + fmt(e.n) + '</td></tr>';
     });
     tbl.innerHTML = html + '</tbody></table>';
-    nt.textContent = 'Euro per MWh och GW. Huvudskattningen kontrollerar för restlasten i alla andra områden som vi har data för (inklusive Norge). Spannet är det lägsta och högsta 95 %-intervallet bland de tre kontrollerade varianterna, och bara egen restlast blir ofta för hög. Skattningen gäller variationer av den storlek som står längst till höger, och större flottor är en extrapolering. * Spannet omfattar noll.';
+    nt.textContent = 'Euro per MWh and GW. The main estimate controls for residual load in all other zones we have data for (including Norway). The range is the lowest and highest 95 % interval among the three controlled variants, and own residual load only is often too high. The estimate applies to variations of the size shown furthest right, and larger fleets are an extrapolation. * The range includes zero.';
 
     var binTr = [], dpTr = [];
     fz.forEach(function (k) {
       var e = SLOPE.zones[k], c = ZONE_COLORS[k] || '#888', b = e[e.central].b;
-      binTr.push({ type: 'scatter', mode: 'markers', name: k, legendgroup: k, x: e.bins.x, y: e.bins.y, marker: { color: c, size: 7 }, hovertemplate: '%{y:.1f} € vid %{x:.2f} GW' });
+      binTr.push({ type: 'scatter', mode: 'markers', name: k, legendgroup: k, x: e.bins.x, y: e.bins.y, marker: { color: c, size: 7 }, hovertemplate: '%{y:.1f} € at %{x:.2f} GW' });
       var xs = [e.bins.x[0], e.bins.x[e.bins.x.length - 1]];
-      binTr.push({ type: 'scatter', mode: 'lines', name: k + ' (lutning)', legendgroup: k, showlegend: false, x: xs, y: xs.map(function (x) { return b * x; }), line: { color: c, width: 1.8, dash: 'dot' }, hoverinfo: 'skip' });
+      binTr.push({ type: 'scatter', mode: 'lines', name: k + ' (slope)', legendgroup: k, showlegend: false, x: xs, y: xs.map(function (x) { return b * x; }), line: { color: c, width: 1.8, dash: 'dot' }, hoverinfo: 'skip' });
       var names = Object.keys(SLOPE.dayparts), vals = names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].b : null; });
-      dpTr.push({ type: 'bar', name: k, x: names.map(function (n) { return n.charAt(0).toUpperCase() + n.slice(1); }), y: vals, marker: { color: c },
+      dpTr.push({ type: 'bar', name: k, x: names.map(function (n) { return DP_EN[n] || (n.charAt(0).toUpperCase() + n.slice(1)); }), y: vals, marker: { color: c },
         error_y: { type: 'data', symmetric: false, thickness: 1.3, width: 3,
                    array: names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].hi - e.dayparts[n].b : 0; }),
                    arrayminus: names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].b - e.dayparts[n].lo : 0; }) },
@@ -1104,6 +1167,83 @@
     });
     Plotly.react('chart-slope-bins', binTr, layout(['x'], { xaxis: { type: 'linear', ticksuffix: ' GW', gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--line'), fixedrange: true }, hovermode: 'closest', yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }) }), CONFIG);
     Plotly.react('chart-slope-dayparts', dpTr, layout(['x'], { xaxis: { type: 'category', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true }, barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }) }), CONFIG);
+  }
+
+  /* ---------- Tab: Overview ---------- */
+  var SWE = ['SE1', 'SE2', 'SE3', 'SE4'];
+  function rollSum(vals, w) {
+    return vals.map(function (_, i) {
+      if (i < w - 1) return null;
+      var t = 0;
+      for (var j = i - w + 1; j <= i; j++) { if (vals[j] == null) return null; t += vals[j]; }
+      return t;
+    });
+  }
+  function ovSeries(k, kind) {
+    var zz = DATA.zones[k];
+    if (kind === 'price') return zoneVals(zz, zz.r_base, ALLM);
+    if (kind === 'vol') return rollW(zoneVals(zz, zz.spread.spread_mean, ALLM), zoneVals(zz, zz.spread_days || zz.months.map(dim), ALLM), 12);
+    if (kind === 'solar') return zoneVals(zz, zz.solar.r_rate, ALLM).map(function (v) { return v == null ? null : v * 100; });
+    return rollSum(zoneVals(zz, zz.load_gwh || nulls(zz), ALLM), 12).map(function (v) { return v == null ? null : v / 1000; });
+  }
+  var OV = [
+    { id: 'price', title: 'Electricity price', def: 'Average day-ahead price, last 12 months', chart: 'ov-chart-price', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true },
+    { id: 'vol', title: 'Price volatility', def: 'Average daily spread (highest minus lowest hourly price)', chart: 'ov-chart-vol', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true },
+    { id: 'solar', title: 'Solar capture rate', def: 'Price earned by solar as a share of the average price', chart: 'ov-chart-solar', axis: ' %', fmtv: function (v) { return fmt(v) + ' %'; }, rel: false },
+    { id: 'cons', title: 'Electricity consumption', def: 'Total consumption, last 12 months', chart: 'ov-chart-cons', axis: ' TWh', fmtv: function (v) { return fmt(v, 1) + ' TWh'; }, rel: true }
+  ];
+
+  function renderOverview() {
+    var zones = SWE.filter(function (k) { return DATA.zones[k]; });
+    var last12 = ALLM.slice(-12), prev12 = ALLM.length >= 24 ? ALLM.slice(-24, -12) : [];
+    var span = function (m) { return m.length ? label(m[0]) + '–' + label(m[m.length - 1]) : ''; };
+    $('ov-lead').textContent = 'The latest 12 months (' + span(last12) + ')' + (prev12.length ? ' compared with the 12 months before (' + span(prev12) + ')' : '') + ', for the four Swedish bidding zones.';
+
+    var cards = '', anyCons = false, anySolar = false;
+    OV.forEach(function (m) {
+      var ups = 0, downs = 0, flats = 0, avail = 0, rows = '';
+      zones.forEach(function (k) {
+        var ser = ovSeries(k, m.id), cur = ser[ser.length - 1], prev = ser[ser.length - 13];
+        var chg = null, cls = 'flat', arrow = '▶', txt = 'n/a';
+        if (cur != null && prev != null && prev !== 0) {
+          chg = m.rel ? (cur / prev - 1) * 100 : cur - prev;
+          avail++;
+          if (chg > 1) { cls = 'up'; arrow = '▲'; ups++; } else if (chg < -1) { cls = 'down'; arrow = '▼'; downs++; } else { flats++; }
+          var shown = Math.abs(chg) < 0.05 ? 0 : chg;
+          txt = (shown > 0 ? '+' : '') + fmt(shown, Math.abs(shown) < 10 ? 1 : 0) + (m.rel ? ' %' : ' pp');
+        }
+        if (m.id === 'cons' && cur != null) anyCons = true;
+        if (m.id === 'solar' && cur != null) anySolar = true;
+        rows += '<tr><td class="z" title="' + DATA.zones[k].name + '">' + k + '</td><td class="v">' + (cur == null ? '–' : m.fmtv(cur)) + '</td><td class="d">' +
+                (chg == null ? '–' : '<span class="arrow ' + cls + '" aria-label="' + (cls === 'up' ? 'increasing' : cls === 'down' ? 'decreasing' : 'flat') + '">' + arrow + '</span>' + txt) + '</td></tr>';
+      });
+      var parts = [];
+      if (ups) parts.push('rising in ' + ups);
+      if (downs) parts.push('falling in ' + downs);
+      if (flats) parts.push('flat in ' + flats);
+      var summary = avail ? parts.join(', ') + ' of ' + avail + ' zones' : 'data not available yet';
+      cards += '<div class="kpi-card"><h3>' + m.title + '</h3><p class="kpi-def">' + m.def + '</p><p class="kpi-summary">' + summary.charAt(0).toUpperCase() + summary.slice(1) + '</p><table class="kpi-rows"><tbody>' + rows + '</tbody></table></div>';
+    });
+    $('ov-kpis').innerHTML = cards;
+
+    OV.forEach(function (m) {
+      var series = {}, first = ALLM.length;
+      zones.forEach(function (k) {
+        series[k] = ovSeries(k, m.id);
+        for (var i = 0; i < series[k].length; i++) if (series[k][i] != null) { if (i < first) first = i; break; }
+      });
+      var xs = ALLM.slice(first).map(label), lists = [];
+      var traces = zones.map(function (k) {
+        var y = series[k].slice(first); lists.push(y);
+        return { type: 'scatter', mode: 'lines', name: k, x: xs, y: y, connectgaps: false, line: { color: ZONE_COLORS[k] || '#888', width: 2.8 },
+                 hovertemplate: m.id === 'cons' ? '%{y:.1f} TWh' : m.id === 'solar' ? '%{y:.0f} %' : '%{y:.0f} €/MWh' };
+      });
+      if (first >= ALLM.length) { Plotly.react(m.chart, [], layout([], {}), CONFIG); return; }
+      Plotly.react(m.chart, traces, layout(xs, { yaxis: yAxis({ ticksuffix: m.axis }, niceRange(extentOf(lists), true, m.id === 'solar' ? 100 : null)) }), CONFIG);
+    });
+    $('ov-note-solar').textContent = anySolar ? 'Solar production in Sweden is incompletely reported to ENTSO-E and is missing for some zones, so this indicator is indicative.' : 'No usable solar production data is reported to ENTSO-E for these zones.';
+    $('ov-note-cons').textContent = anyCons ? '' : 'Consumption data appears after the next workflow run (it needs the updated update_data.py).';
+    $('ov-note').textContent = 'Arrows compare the latest 12 months with the 12 months before and show direction only, not whether a change is good or bad. See the definitions below.';
   }
 
   /* ---------- Flik: Pris och produktion ---------- */
@@ -1119,18 +1259,18 @@
     var xaxis = { type: 'date', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true, tickformat: '%-d %b' };
 
     Plotly.react('chart-hourly', [
-      { type: 'scatter', mode: 'lines', name: 'Pris', x: xs, y: r.price, line: { color: css('--ink'), width: 1.8, shape: 'hv' }, hovertemplate: '%{y:.1f} €/MWh' }
+      { type: 'scatter', mode: 'lines', name: 'Price', x: xs, y: r.price, line: { color: css('--ink'), width: 1.8, shape: 'hv' }, hovertemplate: '%{y:.1f} €/MWh' }
     ], layout(xs, { showlegend: false, xaxis: xaxis, yaxis: yAxis({ zeroline: true, zerolinecolor: css('--muted'), ticksuffix: ' €' }, priceRange) }), CONFIG);
 
     Plotly.react('chart-prod', [
-      { type: 'scatter', mode: 'lines', name: 'Vind', x: xs, y: r.wind, stackgroup: 'p', line: { color: css('--wind'), width: 0.8 }, fillcolor: 'rgba(27,127,158,0.55)', hovertemplate: '%{y:.0f} MW' },
-      { type: 'scatter', mode: 'lines', name: 'Sol', x: xs, y: r.solar, stackgroup: 'p', line: { color: css('--solar'), width: 0.8 }, fillcolor: 'rgba(226,154,14,0.6)', hovertemplate: '%{y:.0f} MW' }
+      { type: 'scatter', mode: 'lines', name: 'Wind', x: xs, y: r.wind, stackgroup: 'p', line: { color: css('--wind'), width: 0.8 }, fillcolor: 'rgba(27,127,158,0.55)', hovertemplate: '%{y:.0f} MW' },
+      { type: 'scatter', mode: 'lines', name: 'Solar', x: xs, y: r.solar, stackgroup: 'p', line: { color: css('--solar'), width: 0.8 }, fillcolor: 'rgba(226,154,14,0.6)', hovertemplate: '%{y:.0f} MW' }
     ], layout(xs, { xaxis: xaxis, yaxis: yAxis({ ticksuffix: ' MW' }) }), CONFIG);
     var missing = [];
-    if (allNull(r.solar)) missing.push('sol');
-    if (allNull(r.wind)) missing.push('vind');
-    var msg = 'Produktionsaxeln anpassas till varje område eftersom volymerna skiljer sig kraftigt.';
-    if (missing.length) msg = 'Ingen rapporterad produktion av ' + missing.join(' och ') + ' de senaste dagarna för detta område. ' + msg;
+    if (allNull(r.solar)) missing.push('solar');
+    if (allNull(r.wind)) missing.push('wind');
+    var msg = 'The production axis is scaled to each zone because volumes differ greatly.';
+    if (missing.length) msg = 'No reported production of ' + missing.join(' and ') + ' in recent days for this zone. ' + msg;
     $('note-prod').textContent = msg;
   }
 
@@ -1147,14 +1287,14 @@
     renderZones();
     renderKpis(z);
     var multi = state.tab === 'capture' || state.tab === 'duck' || state.tab === 'solar' || state.tab === 'depth';
-    ['zones', 'kpis', 'axis-note'].forEach(function (id) { $(id).hidden = multi; });
+    ['zones', 'kpis', 'axis-note'].forEach(function (id) { $(id).hidden = multi || state.tab === 'overview'; });
     $('zonebar').hidden = !multi;
     if (multi) renderZoneChips();
 
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
     });
-    ['capture', 'duck', 'solar', 'depth', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
+    ['overview', 'capture', 'duck', 'solar', 'depth', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
 
     setPressed('seg-view', 'data-view', state.view);
     setPressed('seg-range', 'data-range', state.range);
@@ -1170,6 +1310,7 @@
     setPressed('seg-dn', 'data-dn', state.dn);
     setPressed('seg-dn2', 'data-dn', state.dn);
 
+    if (state.tab === 'overview') renderOverview();
     if (state.tab === 'capture') renderCapture();
     if (state.tab === 'duck') renderDuck();
     if (state.tab === 'solar') renderSolar();
@@ -1267,6 +1408,10 @@
     fetch('data/slope.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
   ]).then(function (res) {
     DATA = res[0]; RECENT = res[1]; SOLAR = res[2]; DEPTH = res[3]; SLOPE = res[4];
+    var ZN = { SE1: 'SE1 Luleå', SE2: 'SE2 Sundsvall', SE3: 'SE3 Stockholm', SE4: 'SE4 Malmö', DE: 'Germany (DE-LU)', DK1: 'Denmark West (DK1)', DK2: 'Denmark East (DK2)', FI: 'Finland' };
+    [DATA, SOLAR, DEPTH, SLOPE].forEach(function (obj) {
+      if (obj && obj.zones) Object.keys(obj.zones).forEach(function (k) { if (ZN[k]) obj.zones[k].name = ZN[k]; });
+    });
     var seen = {};
     DATA.order.forEach(function (k) {
       var zz = DATA.zones[k];
@@ -1275,11 +1420,11 @@
     });
     ALLM = Object.keys(seen).sort();
     $('demo-banner').hidden = !DATA.demo;
-    $('updated').textContent = new Date(DATA.generated).toLocaleString('sv-SE', { dateStyle: 'medium', timeStyle: 'short' });
+    $('updated').textContent = new Date(DATA.generated).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
     bind();
     renderAll();
   }).catch(function () {
-    showError('Kunde inte läsa datafilerna. Kontrollera att mappen data/ ligger bredvid index.html, och öppna sidan via en webbserver (inte direkt från filsystemet).');
+    showError('Could not read the data files. Check that the data/ folder is next to index.html, and open the page through a web server (not directly from the file system).');
   });
 })();
 </script>
