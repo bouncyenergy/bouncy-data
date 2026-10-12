@@ -54,9 +54,9 @@ ZONES = {
     "SE2": {"code": "SE_2", "name": "SE2 Sundsvall"},
     "SE3": {"code": "SE_3", "name": "SE3 Stockholm"},
     "SE4": {"code": "SE_4", "name": "SE4 Malmö"},
-    "DE": {"code": "DE_LU", "name": "Tyskland (DE-LU)"},
-    "DK1": {"code": "DK_1", "name": "Danmark väst (DK1)"},
-    "DK2": {"code": "DK_2", "name": "Danmark öst (DK2)"},
+    "DE": {"code": "DE_LU", "name": "Germany (DE-LU)"},
+    "DK1": {"code": "DK_1", "name": "Denmark West (DK1)"},
+    "DK2": {"code": "DK_2", "name": "Denmark East (DK2)"},
     "FI": {"code": "FI", "name": "Finland"},
     # Kontrollområden: hämtas bara för vind, sol och förbrukning och används när prispåverkan skattas
     "NO1": {"code": "NO_1", "name": "NO1 Oslo", "ctrl": True},
@@ -176,8 +176,7 @@ def fetch_load(client, no_match_error, code: str, start: pd.Timestamp, end: pd.T
 
 def add_load(client, no_match_error, code: str, df: pd.DataFrame, start_default: str) -> pd.DataFrame:
     """Lägger till kolumnen `load` i cachen. Hämtar hela historiken första gången, därefter bara nya dagar."""
-    hist_start = max(pd.Timestamp(start_default, tz=TZ),                               # skattningen behöver bara ca 2 år
-                     pd.Timestamp.now(tz=TZ).normalize() - pd.DateOffset(months=SLOPE_MONTHS + 1))
+    hist_start = pd.Timestamp(start_default, tz=TZ)
     have = df["load"].dropna() if "load" in df else pd.Series(dtype=float)
     if have.empty or have.index.min() > hist_start.tz_convert("UTC") + pd.Timedelta(days=20):
         start = hist_start
@@ -259,6 +258,10 @@ def compute_zone(df: pd.DataFrame, include_partial: bool = False) -> tuple[dict,
             "base": d["price"].mean(),
             "neg_hours": int((d["price"] < 0).sum()),
         }
+        if "load" in d:
+            ld = d["load"].dropna()
+            row["load_n"] = len(ld)
+            row["load_mean"] = float(ld.mean()) if len(ld) else np.nan
         for tech in ("wind", "solar"):
             ok = d[tech].notna()
             coverage = ok.mean()
@@ -276,6 +279,13 @@ def compute_zone(df: pd.DataFrame, include_partial: bool = False) -> tuple[dict,
     for col in ("wind_sum_g", "wind_sum_pg", "solar_sum_g", "solar_sum_pg"):
         if col not in mdf:
             mdf[col] = np.nan
+
+    # ---- förbrukning per månad (GWh), bara månader med minst 90 % täckning ---- #
+    dim_ = pd.Series([pd.Period(m, "M").days_in_month for m in months], index=months)
+    if "load_mean" in mdf:
+        load_gwh = (mdf["load_mean"] * dim_ * 24 / 1000).where(mdf["load_n"] >= 0.9 * dim_ * 24)
+    else:
+        load_gwh = pd.Series(np.nan, index=months)
 
     # ---- rullande 12 mån ------------------------------------------------- #
     r_base = mdf["sum_p"].rolling(12, min_periods=12).sum() / mdf["n"].rolling(12, min_periods=12).sum()
@@ -316,6 +326,7 @@ def compute_zone(df: pd.DataFrame, include_partial: bool = False) -> tuple[dict,
         "base": lst(mdf["base"]),
         "r_base": lst(r_base),
         "neg_hours": [None if pd.isna(v) else int(v) for v in mdf["neg_hours"]],
+        "load_gwh": lst(load_gwh, 1),
         "wind": tech_out["wind"],
         "solar": tech_out["solar"],
         "spread": {c: lst(sp[c]) for c in sp.columns if c != "days"},
@@ -525,8 +536,8 @@ def compute_solar_bess(prices: dict, cf_arr: np.ndarray, window: list[str], name
 # går att skatta ur historiken: pris mot restlast, med fasta effekter för månad (bränslepris, vattenläge)
 # och timme på dygnet x vardag/helg. Vind och förbrukning varierar av väderskäl, så det är bra variation.
 SLOPE_MONTHS = 24
-DAYPARTS = {"natt": [22, 23, 0, 1, 2, 3, 4, 5], "morgon": [6, 7, 8, 9], "dag": [10, 11, 12, 13, 14, 15],
-            "kväll": [16, 17, 18, 19, 20, 21]}
+DAYPARTS = {"night": [22, 23, 0, 1, 2, 3, 4, 5], "morning": [6, 7, 8, 9], "day": [10, 11, 12, 13, 14, 15],
+            "evening": [16, 17, 18, 19, 20, 21]}
 REFERENCE_ZONE = "DE"             # kontrolleras för i övriga områden, eftersom de prissätts tillsammans med Tyskland
 
 
