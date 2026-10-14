@@ -439,7 +439,7 @@
   function layout(xs, extra) {
     var step = Math.max(1, Math.ceil(xs.length / 12));
     var base = {
-      margin: { l: 52, r: 14, t: 10, b: 44 },
+      margin: { l: 52, r: 14, t: 10, b: 52 },
       paper_bgcolor: 'rgba(0,0,0,0)',
       plot_bgcolor: 'rgba(0,0,0,0)',
       font: { family: css('--font-body'), size: 12, color: css('--ink') },
@@ -451,9 +451,10 @@
         tickvals: xs.filter(function (_, i) { return i % step === 0; }),
         gridcolor: 'rgba(0,0,0,0)',
         linecolor: css('--line'),
-        fixedrange: true
+        fixedrange: true,
+        automargin: true
       },
-      yaxis: { gridcolor: css('--line'), zeroline: false, fixedrange: true }
+      yaxis: { gridcolor: css('--line'), zeroline: false, fixedrange: true, automargin: true }
     };
     return Object.assign(base, extra || {});
   }
@@ -483,7 +484,7 @@
     return [lo, hi];
   }
   function yAxis(extra, range) {
-    var ax = { gridcolor: css('--line'), zeroline: false, fixedrange: true };
+    var ax = { gridcolor: css('--line'), zeroline: false, fixedrange: true, automargin: true };
     Object.assign(ax, extra || {});
     if (range) { ax.range = range; ax.autorange = false; }
     return ax;
@@ -750,7 +751,7 @@
       { type: 'scatter', mode: 'lines', name: 'Delivered after ' + SC_NAME[state.solScn].replace(' BESS', ' battery'), x: hours, y: out, line: { color: SC_COLOR['4h'], width: 2.6, shape: 'hv' }, hovertemplate: '%{y:.2f} MW' },
       { type: 'scatter', mode: 'lines', name: 'Price (right axis)', x: hours, y: e.p, yaxis: 'y2', line: { color: css('--wind'), width: 2, dash: 'dot', shape: 'hv' }, hovertemplate: '%{y:.0f} €/MWh' }
     ], layout(hours, {
-      margin: { l: 52, r: 56, t: 10, b: 44 },
+      margin: { l: 52, r: 56, t: 10, b: 52 },
       yaxis: yAxis({ ticksuffix: ' MW' }, [0, ymax]),
       yaxis2: { overlaying: 'y', side: 'right', range: [pmin, pmax], ticksuffix: ' €', showgrid: false, zeroline: false, fixedrange: true }
     }), CONFIG);
