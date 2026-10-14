@@ -151,7 +151,7 @@
   .arrow.up { color: var(--wind); }
   .arrow.down { color: #b87500; }
   .arrow.flat { color: var(--muted); }
-  .ov-charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 8px; }
+  .ov-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 8px; }
   .ov-charts .chart-block { margin-bottom: 0; }
   .ov-charts .chart { height: 300px; }
   @media (max-width: 820px) { .ov-charts { grid-template-columns: 1fr; } }
@@ -196,7 +196,7 @@
 <body>
 <div class="wrap">
   <h1>Swedish electricity market</h1>
-  <p class="lede">Prices, volatility, solar capture rates and consumption for the four Swedish bidding zones, with Finland, Denmark and Germany as comparison. Updated every night from ENTSO-E.</p>
+  <p class="lede">Prices, volatility and solar capture rates for the four Swedish bidding zones, with Finland, Denmark and Germany as comparison. Updated every night from ENTSO-E.</p>
 
   <div id="demo-banner" class="banner" hidden>You are viewing demo data (synthetic values). Real values appear after the first run against ENTSO-E.</div>
   <div id="error" class="banner" hidden></div>
@@ -219,7 +219,7 @@
 
   <!-- Overview -->
   <section class="panel" id="panel-overview">
-    <p class="ov-lead" id="ov-lead"></p>
+    <p class="ov-lead"><span id="ov-lead"></span><sup><a href="#n6">6</a></sup></p>
     <div class="kpi-grid" id="ov-kpis"></div>
     <div class="ov-charts">
       <div class="chart-block">
@@ -238,12 +238,6 @@
         <div class="chart" id="ov-chart-solar"></div>
         <p class="note" id="ov-note-solar"></p>
       </div>
-      <div class="chart-block">
-        <h2>Electricity consumption</h2>
-        <p class="sub">Total consumption, rolling 12 months, TWh.<sup><a href="#n16">16</a></sup></p>
-        <div class="chart" id="ov-chart-cons"></div>
-        <p class="note" id="ov-note-cons"></p>
-      </div>
     </div>
     <p class="note" id="ov-note"></p>
   </section>
@@ -252,17 +246,9 @@
   <section class="panel" id="panel-duck" hidden>
     <p class="note alert" id="note-nozones"></p>
 
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Period for the time charts" id="seg-range3">
-        <button data-range="12" aria-pressed="true">12 mo</button>
-        <button data-range="24" aria-pressed="false">24 mo</button>
-        <button data-range="0" aria-pressed="false">All</button>
-      </div>
-    </div>
-
     <div class="chart-block">
       <h2 id="profile-title">Daily profile</h2>
-      <p class="sub">Average price for each hour of the day (Swedish time) for the selected zones. A price dip in the middle of the day followed by an evening peak is often called the duck curve. Solid line is the latest 12 months, dashed is months 13–24.<sup><a href="#n7">7</a>, <a href="#n8">8</a></sup></p>
+      <p class="sub">Average price for each hour of the day (Swedish time) for the selected zones. A price dip in the middle of the day followed by an evening peak is often called the duck curve. Solid line is the latest 12 months, dashed is months 13–24.<sup><a href="#n5">5</a>, <a href="#n7">7</a>, <a href="#n8">8</a></sup></p>
       <div class="controls inner">
         <div class="seg" role="group" aria-label="Season" id="seg-profile">
           <button data-profile="all" aria-pressed="true">Whole year</button>
@@ -366,13 +352,10 @@
       <dd>Sweden is divided into four (SE1–SE4). Finland, Denmark (DK1 and DK2) and Germany (here DE-LU, together with Luxembourg) are shown for comparison.</dd>
 
       <dt>Average price</dt>
-      <dd>The average day-ahead price over the period, where all hours carry equal weight.</dd>
+      <dd>The simple average of the hourly day-ahead prices over the period. All hours carry equal weight, so it is not weighted by consumption or production.</dd>
 
       <dt>Price volatility</dt>
       <dd>Here measured as the average daily spread, the day's highest minus lowest hourly price, over the latest twelve months. Larger swings within the day mean more room for flexibility such as batteries and demand response.</dd>
-
-      <dt>Consumption</dt>
-      <dd>Actual total load per bidding zone as reported to ENTSO-E, summed over twelve months and shown in terawatt-hours (TWh).</dd>
 
       <dt>Arrows (Overview)</dt>
       <dd>Compare the latest 12 months with the 12 months before. An arrow pointing up or down means a change of more than 1 % (for solar capture rate, more than 1 percentage point). Smaller changes are shown as flat. The arrows show direction only, not whether a change is good or bad.</dd>
@@ -384,7 +367,7 @@
       <dd>Capture price divided by the average price, in percent. 100 % means the technology received a price equal to the average, and lower values mean production falls in hours with lower prices than average.</dd>
 
       <dt>Rolling 12 months</dt>
-      <dd>The same calculation over the latest twelve months in one go, weighted by production. It is not an average of twelve monthly ratios. In the Duck curve tab, a dashed line shows the same measure twelve months earlier (months 13–24 back), so that you can see the change compared with the year before.</dd>
+      <dd>The same calculation over the latest twelve months in one go, with the same weighting as the monthly figure: hours for prices, days for spreads and production for capture rate. It is not an average of twelve monthly figures. In the Duck curve tab, a dashed line shows the same measure twelve months earlier (months 13–24 back), so that you can see the change compared with the year before.</dd>
 
       <dt>Daily spread</dt>
       <dd>The difference between the day's highest and lowest hourly price, in EUR/MWh. Shown as an average over the days of the month, or rolling over twelve months.</dd>
@@ -403,10 +386,10 @@
     </dl>
 
     <ol class="notes">
-      <li id="n1"><strong>Capture rate.</strong> Calculated as the sum of price times production divided by the sum of production, and then divided by the average price. Wind is onshore plus offshore wind. Production is ENTSO-E's actual aggregated generation per production type.</li>
+      <li id="n1"><strong>Capture rate.</strong> Calculated as the sum of price times production divided by the sum of production, and then divided by the average price. Production is ENTSO-E's actual aggregated generation per production type.</li>
       <li id="n2"><strong>The spread is hourly.</strong> It is calculated on hourly averages of the price, per day in Swedish time, and not on quarter-hour prices. Short price peaks and troughs are therefore smoothed out, and the figures are lower than if calculated at 15-minute level. Days with fewer than 22 hours of data are not counted.</li>
       <li id="n3"><strong>Spread is not revenue.</strong> The measure shows the theoretical difference between the day's highest and lowest price. Anyone who wants to earn on the spread, for example with a battery, is affected by efficiency, number of cycles per day, power and energy limits, grid fees, and differences between day-ahead, intraday and reserve markets. The outcome is therefore lower.</li>
-      <li id="n4"><strong>Solar and wind: coverage.</strong> The quality of reporting to ENTSO-E differs between countries and over time. Solar production in Sweden in particular is incomplete, because much solar power is small-scale or behind the meter and is not fully reported. The figures show reported production and not necessarily the full actual production. Months where production data is missing for more than 20 % of the hours are shown as empty.</li>
+      <li id="n4"><strong>Solar production: coverage.</strong> The quality of reporting to ENTSO-E differs between countries and over time. Solar production in Sweden in particular is incomplete, because much solar power is small-scale or behind the meter and is not fully reported. The figures show reported production and not necessarily the full actual production. Months where production data is missing for more than 20 % of the hours are shown as empty.</li>
       <li id="n5"><strong>Resolution.</strong> Day-ahead has had 15-minute resolution since October 2025 (hourly prices before that). Everything is aggregated here to hourly averages so that older and newer data are comparable. A negative quarter-hour within an hour is therefore not visible if the hourly average is above zero.</li>
       <li id="n6"><strong>Which months are shown.</strong> The current month is not shown, nor are months where more than 10 % of price data is missing. Production data is revised afterwards by the grid operators, so earlier months may change slightly at the next update.</li>
       <li id="n7"><strong>Time of day.</strong> All times and days refer to Swedish time (CET/CEST). "10–14" means the hours 10, 11, 12 and 13, and "00–04" means the hours 00, 01, 02 and 03. A daytime or night-time price is only shown for months where all four hours are available.</li>
@@ -414,7 +397,6 @@
       <li id="n9"><strong>The solar park.</strong> Production is calculated with PVGIS for 1 MWp of crystalline silicon in Halmstad (56.7° N, 12.9° E), 30° tilt, facing due south and 14 % system losses. The profile comes from a historical weather year and is placed on the same dates over the last twelve months. It therefore does not follow the actual weather. In reality the price often falls when it is sunny, so the capture rate for a real park is likely somewhat lower than here. Halmstad is in SE4, and the other zones are shown as hypothetical comparisons with the same production profile.</li>
       <li id="n10"><strong>The battery model.</strong> The battery's power equals the park's peak power (1 MW per MWp). Duration is 1, 2 or 4 hours and round-trip efficiency 88 %. The battery is charged only from the solar park, never from the grid, and is empty at the end of the day. For each day the charging and discharging hours that give the highest revenue are chosen, with knowledge of all the day's day-ahead prices in advance. Production is not curtailed, and losses in the battery count as sold energy that does not materialise.</li>
       <li id="n11"><strong>Capture price with battery</strong> is revenue divided by the solar park's production, including battery losses. Capture rate is capture price divided by the zone's average price over the same period. The calculation does not include grid fees, balancing costs, intraday trading, ancillary services, degradation or investment costs and should be seen as an illustration of the price value in the day-ahead market.</li>
-      <li id="n16"><strong>Consumption.</strong> ENTSO-E's reported actual total load per bidding zone, aggregated to hourly values and summed over twelve months. Months with fewer than 90 % of the hours reported are left out, so a rolling 12-month figure requires twelve complete months. The grid operators may revise the data afterwards.</li>
     </ol>
 
     <p class="disclaimer">The information is intended as background only and does not constitute investment advice or any other advice. Data may contain errors or gaps. Currency: euro.</p>
@@ -760,26 +742,17 @@
 
   /* ---------- Tab: Overview ---------- */
   var SWE = ['SE1', 'SE2', 'SE3', 'SE4'];
-  function rollSum(vals, w) {
-    return vals.map(function (_, i) {
-      if (i < w - 1) return null;
-      var t = 0;
-      for (var j = i - w + 1; j <= i; j++) { if (vals[j] == null) return null; t += vals[j]; }
-      return t;
-    });
-  }
   function ovSeries(k, kind) {
     var zz = DATA.zones[k];
     if (kind === 'price') return zoneVals(zz, zz.r_base, ALLM);
     if (kind === 'vol') return rollW(zoneVals(zz, zz.spread.spread_mean, ALLM), zoneVals(zz, zz.spread_days || zz.months.map(dim), ALLM), 12);
     if (kind === 'solar') return zoneVals(zz, zz.solar.r_rate, ALLM).map(function (v) { return v == null ? null : v * 100; });
-    return rollSum(zoneVals(zz, zz.load_gwh || nulls(zz), ALLM), 12).map(function (v) { return v == null ? null : v / 1000; });
+    return [];
   }
   var OV = [
     { id: 'price', title: 'Electricity price', def: 'Average day-ahead price, last 12 months', chart: 'ov-chart-price', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true },
     { id: 'vol', title: 'Price volatility', def: 'Average daily spread (highest minus lowest hourly price)', chart: 'ov-chart-vol', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true },
-    { id: 'solar', title: 'Solar capture rate', def: 'Price earned by solar as a share of the average price', chart: 'ov-chart-solar', axis: ' %', fmtv: function (v) { return fmt(v) + ' %'; }, rel: false },
-    { id: 'cons', title: 'Electricity consumption', def: 'Total consumption, last 12 months', chart: 'ov-chart-cons', axis: ' TWh', fmtv: function (v) { return fmt(v, 1) + ' TWh'; }, rel: true }
+    { id: 'solar', title: 'Solar capture rate', def: 'Price earned by solar as a share of the average price', chart: 'ov-chart-solar', axis: ' %', fmtv: function (v) { return fmt(v) + ' %'; }, rel: false }
   ];
 
   function renderOverview() {
@@ -788,7 +761,7 @@
     var span = function (m) { return m.length ? label(m[0]) + '–' + label(m[m.length - 1]) : ''; };
     $('ov-lead').textContent = 'The latest 12 months (' + span(last12) + ')' + (prev12.length ? ' compared with the 12 months before (' + span(prev12) + ')' : '') + ', for the four Swedish bidding zones.';
 
-    var cards = '', anyCons = false, anySolar = false;
+    var cards = '', anySolar = false;
     OV.forEach(function (m) {
       var ups = 0, downs = 0, flats = 0, avail = 0, rows = '';
       zones.forEach(function (k) {
@@ -801,7 +774,6 @@
           var shown = Math.abs(chg) < 0.05 ? 0 : chg;
           txt = (shown > 0 ? '+' : '') + fmt(shown, Math.abs(shown) < 10 ? 1 : 0) + (m.rel ? ' %' : ' pp');
         }
-        if (m.id === 'cons' && cur != null) anyCons = true;
         if (m.id === 'solar' && cur != null) anySolar = true;
         rows += '<tr><td class="z" title="' + DATA.zones[k].name + '">' + k + '</td><td class="v">' + (cur == null ? '–' : m.fmtv(cur)) + '</td><td class="d">' +
                 (chg == null ? '–' : '<span class="arrow ' + cls + '" aria-label="' + (cls === 'up' ? 'increasing' : cls === 'down' ? 'decreasing' : 'flat') + '">' + arrow + '</span>' + txt) + '</td></tr>';
@@ -825,13 +797,15 @@
       var traces = zones.map(function (k) {
         var y = series[k].slice(first); lists.push(y);
         return { type: 'scatter', mode: 'lines', name: k, x: xs, y: y, connectgaps: false, line: { color: ZONE_COLORS[k] || '#888', width: 2.8 },
-                 hovertemplate: m.id === 'cons' ? '%{y:.1f} TWh' : m.id === 'solar' ? '%{y:.0f} %' : '%{y:.0f} €/MWh' };
+                 hovertemplate: m.id === 'solar' ? '%{y:.0f} %' : '%{y:.0f} €/MWh' };
       });
       if (first >= ALLM.length) { Plotly.react(m.chart, [], layout([], {}), CONFIG); return; }
       Plotly.react(m.chart, traces, layout(xs, { yaxis: yAxis({ ticksuffix: m.axis }, niceRange(extentOf(lists), true, m.id === 'solar' ? 100 : null)) }), CONFIG);
     });
-    $('ov-note-solar').textContent = anySolar ? 'Solar production in Sweden is incompletely reported to ENTSO-E and is missing for some zones, so this indicator is indicative.' : 'No usable solar production data is reported to ENTSO-E for these zones.';
-    $('ov-note-cons').textContent = anyCons ? '' : 'Consumption data appears after the next workflow run (it needs the updated update_data.py).';
+    var noSolar = zones.filter(function (k) { var sr = ovSeries(k, 'solar'); return sr[sr.length - 1] == null; });
+    $('ov-note-solar').textContent = anySolar
+      ? 'Solar production in Sweden is incompletely reported to ENTSO-E, so this indicator is indicative.' + (noSolar.length ? ' No usable data for ' + noSolar.join(', ') + '.' : '')
+      : 'No usable solar production data is reported to ENTSO-E for these zones.';
     $('ov-note').textContent = 'Arrows compare the latest 12 months with the 12 months before and show direction only, not whether a change is good or bad. See the definitions below.';
   }
 
@@ -853,7 +827,6 @@
     ['overview', 'duck', 'solar'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
 
     setPressed('seg-solscn', 'data-scn', state.solScn);
-    setPressed('seg-range3', 'data-range', state.range);
     setPressed('seg-profile', 'data-profile', state.profile);
     setPressed('seg-dview', 'data-dview', state.dview);
     setPressed('seg-dn', 'data-dn', state.dn);
@@ -868,12 +841,6 @@
     $('tabs').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       state.tab = b.dataset.tab; renderAll();
-    });
-    ['seg-range3'].forEach(function (id) {
-      $(id).addEventListener('click', function (e) {
-        var b = e.target.closest('button'); if (!b) return;
-        state.range = parseInt(b.dataset.range, 10); renderAll();
-      });
     });
     $('seg-profile').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
