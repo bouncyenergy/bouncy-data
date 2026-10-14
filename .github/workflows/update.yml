@@ -44,7 +44,11 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
           git add data docs/data
-          git diff --cached --quiet || (git commit -m "Uppdatera data $(date -u +%F)" && git push)
+          if ! git diff --cached --quiet; then
+            git commit -m "Uppdatera data $(date -u +%F)"
+            git pull --rebase origin main      # någon kan ha sparat något under tiden (till exempel du i webbläsaren)
+            git push
+          fi
 
       - uses: actions/configure-pages@v5
 
