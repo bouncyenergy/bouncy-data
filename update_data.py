@@ -441,9 +441,107 @@ def optimise_day(p: np.ndarray, g: np.ndarray, energy: float, power: float, rte:
     return np.clip(res.x[:n], 0, None), np.clip(res.x[n:], 0, None)
 
 
-def compute_solar_bess(prices: dict, cf_arr: np.ndarray, window: list[str], names: dict) -> dict:
-    """Capture price/rate för en solpark (1 MWp) utan och med 1, 2 och 4 timmars batteri, per elområde."""
+def _solar_scenarios(loc_idx, month, p_all: np.ndarray, g_all: np.ndarray, window: list[str], day_ok=None) -> dict | None:
+    """Capture price/rate utan och med batteri för en given produktionsprofil (MW per MWp, en timme per rad)."""
     power = BESS_POWER_PER_MWP
+    date = np.asarray(loc_idx.strftime("%Y-%m-%d"))
+    days = pd.Series(np.arange(len(p_all))).groupby(date).indices
+
+    acc = {m: {sc: np.zeros(4) for sc in SCENARIOS} for m in window}        # intäkt, produktion, laddat, urladdat
+    base = {m: np.zeros(2) for m in window}                                  # summa pris, antal timmar
+    cands = {m: [] for m in window}                                          # kandidater till exempeldag
+    used = 0
+    for d, idx in days.items():
+        n = len(idx)
+        if n < 23 or (day_ok is not None and d not in day_ok):
+            continue
+        used += 1
+        p, g, m = p_all[idx], g_all[idx], month[idx[0]]
+        base[m] += (p.sum(), n)
+        rev0 = float((p * g).sum())
+        acc[m]["none"] += (rev0, g.sum(), 0.0, 0.0)
+        if n == 24 and g.sum() > 0:
+            cands[m].append((float(g.sum()), d))
+        for hrs in BESS_HOURS:
+            if g.sum() < 1e-6 or p.max() - p.min() < 1e-6:
+                acc[m][f"{hrs}h"] += (rev0, g.sum(), 0.0, 0.0)
+                continue
+            c, dch = optimise_day(p, g, hrs * power, power, BESS_RTE)
+            acc[m][f"{hrs}h"] += (float((p * (g - c + dch)).sum()), g.sum(), c.sum(), dch.sum())
+
+    def cp_cr(a, b):
+        return (a[0] / a[1], (a[0] / a[1]) / (b[0] / b[1])) if a[1] > 0 and b[1] > 0 else (None, None)
+
+    tot_base = sum(base.values(), np.zeros(2))
+    if tot_base[1] == 0:
+        return None
+    total, monthly = {}, {"months": window, "base": [None if base[m][1] == 0 else round(base[m][0] / base[m][1], 2) for m in window]}
+    for sc in SCENARIOS:
+        a = sum((acc[m][sc] for m in window), np.zeros(4))
+        cp, cr = cp_cr(a, tot_base)
+        entry = {"cp": None if cp is None else round(cp, 2), "cr": None if cr is None else round(cr, 4)}
+        if sc != "none" and a[1] > 0:
+            hrs = int(sc[:-1])
+            entry["share"] = round(a[2] / a[1], 4)                       # andel av produktionen som går via batteriet
+            entry["cycles"] = round(a[3] / (hrs * power), 1)             # fulla cykler under perioden
+        total[sc] = entry
+        vals = [cp_cr(acc[m][sc], base[m]) for m in window]
+        monthly[sc] = {"cp": [None if v[0] is None else round(v[0], 2) for v in vals],
+                       "cr": [None if v[1] is None else round(v[1], 4) for v in vals]}
+
+    # exempeldag: dagen med medianproduktion i varje månad
+    examples = []
+    for m in window:
+        if not cands[m]:
+            continue
+        ordered = sorted(cands[m])
+        d = ordered[len(ordered) // 2][1]
+        idx = days[d]
+        p, g = p_all[idx], g_all[idx]
+        ex = {"month": m, "date": d, "p": [round(float(v), 2) for v in p], "pv": [round(float(v), 3) for v in g]}
+        for hrs in BESS_HOURS:
+            c, dch = optimise_day(p, g, hrs * power, power, BESS_RTE)
+            ex[f"{hrs}h"] = [round(float(v), 3) for v in (g - c + dch)]
+        examples.append(ex)
+
+    return {"base": round(float(tot_base[0] / tot_base[1]), 2),
+            "yield": round(float(sum(acc[m]["none"][1] for m in window)), 0),
+            "days": used, "total": total, "monthly": monthly, "examples": examples}
+
+
+REPORTED_MIN_COVERAGE = 0.8       # andel dygn med fullständigt rapporterad solproduktion som krävs
+
+
+def reported_profile(index, loc_idx, solar: pd.Series, g_pv: np.ndarray):
+    """
+    Produktionsprofil av den solproduktion som rapporterats till ENTSO-E för området (verkligt väder).
+    Skalas så att energin under de giltiga dygnen är lika stor som PVGIS-profilens, eftersom installerad
+    effekt för de rapporterande anläggningarna är okänd. Returnerar (profil, giltiga dygn, täckning) eller None.
+    """
+    r = solar.reindex(index).to_numpy(dtype=float)
+    date = np.asarray(loc_idx.strftime("%Y-%m-%d"))
+    day_complete = pd.DataFrame({"d": date, "ok": ~np.isnan(r)}).groupby("d")["ok"].all()
+    if len(day_complete) == 0:
+        return None
+    coverage = float(day_complete.mean())
+    if coverage < REPORTED_MIN_COVERAGE:
+        return None
+    valid_days = set(day_complete[day_complete].index)
+    mask = np.isin(date, list(valid_days))
+    total_rep = float(np.nansum(r[mask]))
+    if total_rep <= 0:
+        return None
+    k = float(g_pv[mask].sum()) / total_rep
+    g = np.where(mask, np.nan_to_num(r) * k, 0.0)
+    return g, valid_days, round(coverage, 3)
+
+
+def compute_solar_bess(prices: dict, cf_arr: np.ndarray, window: list[str], names: dict, solar: dict | None = None) -> dict:
+    """
+    Capture price/rate för en solpark (1 MWp) utan och med 1, 2 och 4 timmars batteri, per elområde.
+    Grundprofil: PVGIS (typiskt väder). Om `solar` ges och området har tillräcklig täckning beräknas även
+    en variant med ENTSO-E:s rapporterade solproduktion (verkligt väder) under nyckeln "reported".
+    """
     result = {}
     for key, price in prices.items():
         s = price.dropna()
@@ -456,67 +554,23 @@ def compute_solar_bess(prices: dict, cf_arr: np.ndarray, window: list[str], name
             continue
         s, loc_idx, month = s[sel], loc_idx[sel], month[sel]
         p_all = s.to_numpy(dtype=float)
-        g_all = np.nan_to_num(cf_arr[s.index.month - 1, s.index.day - 1, s.index.hour])
-        date = np.asarray(loc_idx.strftime("%Y-%m-%d"))
-        days = pd.Series(np.arange(len(s))).groupby(date).indices
+        g_pv = np.nan_to_num(cf_arr[s.index.month - 1, s.index.day - 1, s.index.hour])
 
-        acc = {m: {sc: np.zeros(4) for sc in SCENARIOS} for m in window}        # intäkt, produktion, laddat, urladdat
-        base = {m: np.zeros(2) for m in window}                                  # summa pris, antal timmar
-        cands = {m: [] for m in window}                                          # kandidater till exempeldag
-        for d, idx in days.items():
-            n = len(idx)
-            if n < 23:
-                continue
-            p, g, m = p_all[idx], g_all[idx], month[idx[0]]
-            base[m] += (p.sum(), n)
-            rev0 = float((p * g).sum())
-            acc[m]["none"] += (rev0, g.sum(), 0.0, 0.0)
-            if n == 24 and g.sum() > 0:
-                cands[m].append((float(g.sum()), d))
-            for hrs in BESS_HOURS:
-                if g.sum() < 1e-6 or p.max() - p.min() < 1e-6:
-                    acc[m][f"{hrs}h"] += (rev0, g.sum(), 0.0, 0.0)
-                    continue
-                c, dch = optimise_day(p, g, hrs * power, power, BESS_RTE)
-                acc[m][f"{hrs}h"] += (float((p * (g - c + dch)).sum()), g.sum(), c.sum(), dch.sum())
-
-        def cp_cr(a, b):
-            return (a[0] / a[1], (a[0] / a[1]) / (b[0] / b[1])) if a[1] > 0 and b[1] > 0 else (None, None)
-
-        tot_base = sum(base.values(), np.zeros(2))
-        total, monthly = {}, {"months": window, "base": [None if base[m][1] == 0 else round(base[m][0] / base[m][1], 2) for m in window]}
-        for sc in SCENARIOS:
-            a = sum((acc[m][sc] for m in window), np.zeros(4))
-            cp, cr = cp_cr(a, tot_base)
-            entry = {"cp": None if cp is None else round(cp, 2), "cr": None if cr is None else round(cr, 4)}
-            if sc != "none" and a[1] > 0:
-                hrs = int(sc[:-1])
-                entry["share"] = round(a[2] / a[1], 4)                       # andel av produktionen som går via batteriet
-                entry["cycles"] = round(a[3] / (hrs * power), 1)             # fulla cykler under perioden
-            total[sc] = entry
-            vals = [cp_cr(acc[m][sc], base[m]) for m in window]
-            monthly[sc] = {"cp": [None if v[0] is None else round(v[0], 2) for v in vals],
-                           "cr": [None if v[1] is None else round(v[1], 4) for v in vals]}
-
-        # exempeldag: dagen med medianproduktion i varje månad
-        examples = []
-        for m in window:
-            if not cands[m]:
-                continue
-            ordered = sorted(cands[m])
-            d = ordered[len(ordered) // 2][1]
-            idx = days[d]
-            p, g = p_all[idx], g_all[idx]
-            ex = {"month": m, "date": d, "p": [round(float(v), 2) for v in p], "pv": [round(float(v), 3) for v in g]}
-            for hrs in BESS_HOURS:
-                c, dch = optimise_day(p, g, hrs * power, power, BESS_RTE)
-                ex[f"{hrs}h"] = [round(float(v), 3) for v in (g - c + dch)]
-            examples.append(ex)
-
-        result[key] = {"name": names.get(key, key), "base": round(float(tot_base[0] / tot_base[1]), 2),
-                       "yield": round(float(sum(acc[m]["none"][1] for m in window)), 0),
-                       "total": total, "monthly": monthly, "examples": examples}
-        log.info("%s: solpark + BESS klar (%d dygn)", key, len(days))
+        entry = _solar_scenarios(loc_idx, month, p_all, g_pv, window)
+        if entry is None:
+            continue
+        entry["name"] = names.get(key, key)
+        if solar is not None and key in solar:
+            rep = reported_profile(s.index, loc_idx, solar[key], g_pv)
+            if rep is not None:
+                g_rep, day_ok, coverage = rep
+                r_entry = _solar_scenarios(loc_idx, month, p_all, g_rep, window, day_ok)
+                if r_entry is not None:
+                    r_entry["coverage"] = coverage
+                    entry["reported"] = r_entry
+        result[key] = entry
+        log.info("%s: solpark + BESS klar (%d dygn%s)", key, entry["days"],
+                 ", rapporterad solprofil %.0f %% av dygnen" % (100 * entry["reported"]["coverage"]) if "reported" in entry else "")
     return result
 
 
@@ -639,9 +693,11 @@ def main() -> int:
         else:
             months_all = sorted({m for z in summary_zones.values() for m in z["months"]})
             res = compute_solar_bess({k: frames[k]["price"] for k in summary_zones}, cf_arr, months_all[-12:],
-                                     {k: ZONES[k]["name"] for k in summary_zones})
+                                     {k: ZONES[k]["name"] for k in summary_zones},
+                                     solar={k: frames[k]["solar"] for k in summary_zones if "solar" in frames[k]})
             site = {"name": "Halmstad", **PV, "bess_hours": BESS_HOURS, "bess_power_mw_per_mwp": BESS_POWER_PER_MWP,
-                    "rte": BESS_RTE, "window": months_all[-12:], "annual_kwh_per_kwp": round(annual_yield(cf_arr))}
+                    "rte": BESS_RTE, "window": months_all[-12:], "annual_kwh_per_kwp": round(annual_yield(cf_arr)),
+                    "reported_min_coverage": REPORTED_MIN_COVERAGE}
             log.info("Solparkens årsproduktion i profilen: %d kWh/kWp", site["annual_kwh_per_kwp"])
             (OUT_DIR / "solar_bess.json").write_text(
                 json.dumps({"generated": stamp, "demo": bool(args.demo), "site": site, "zones": res},
