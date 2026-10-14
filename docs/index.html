@@ -201,18 +201,10 @@
   <div id="demo-banner" class="banner" hidden>You are viewing demo data (synthetic values). Real values appear after the first run against ENTSO-E.</div>
   <div id="error" class="banner" hidden></div>
 
-  <div class="zones" id="zones" role="group" aria-label="Bidding zone"></div>
-  <p class="axis-note" id="axis-note">The y-axes are shared across all bidding zones (except production in MW), so you can switch zone and compare directly.</p>
-
-  <dl class="kpis" id="kpis"></dl>
-
   <div class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
-    <button role="tab" data-tab="capture" aria-selected="false">Capture rate</button>
     <button role="tab" data-tab="duck" aria-selected="false">Duck curve</button>
     <button role="tab" data-tab="solar" aria-selected="false">Solar park + BESS</button>
-    <button role="tab" data-tab="depth" aria-selected="false">Arbitrage depth</button>
-    <button role="tab" data-tab="recent" aria-selected="false">Price and production</button>
   </div>
 
   <div class="zonebar" id="zonebar" role="group" aria-label="Select bidding zones">
@@ -254,43 +246,6 @@
       </div>
     </div>
     <p class="note" id="ov-note"></p>
-  </section>
-
-  <!-- Capture rate -->
-  <section class="panel" id="panel-capture" hidden>
-    <div class="controls">
-      <div class="seg" role="group" aria-label="Technology" id="seg-tech">
-        <button data-tech="wind" aria-pressed="true">Wind</button>
-        <button data-tech="solar" aria-pressed="false">Solar</button>
-      </div>
-      <div class="seg" role="group" aria-label="Calculation" id="seg-view">
-        <button data-view="monthly" aria-pressed="true">Monthly</button>
-        <button data-view="rolling" aria-pressed="false">Rolling 12 mo</button>
-      </div>
-      <div class="seg" role="group" aria-label="Period" id="seg-range">
-        <button data-range="12" aria-pressed="true">12 mo</button>
-        <button data-range="24" aria-pressed="false">24 mo</button>
-        <button data-range="0" aria-pressed="false">All</button>
-      </div>
-    </div>
-    <p class="note alert" id="note-nozones-c"></p>
-    <div class="chart-block">
-      <h2 id="rate-title">Capture rate</h2>
-      <p class="sub">Production-weighted price as a percentage of the average price. Below 100 % means the technology earns less than the average.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
-      <div class="chart" id="chart-rate"></div>
-      <p class="note" id="note-rate"></p>
-    </div>
-    <div class="chart-block">
-      <h2 id="price-title">Capture price</h2>
-      <p class="sub">Euro per megawatt-hour.</p>
-      <div class="controls inner">
-        <div class="seg" role="group" aria-label="Average price" id="seg-base">
-          <button data-base="off" aria-pressed="true">Capture price only</button>
-          <button data-base="on" aria-pressed="false">Also show average price (dotted)</button>
-        </div>
-      </div>
-      <div class="chart" id="chart-price"></div>
-    </div>
   </section>
 
   <!-- Duck curve -->
@@ -344,7 +299,6 @@
       <div class="controls inner">
         <div class="seg" role="group" aria-label="Calculation, daytime price" id="seg-dn">
           <button data-dn="rolling" aria-pressed="true">Rolling 12 mo</button>
-          <button data-dn="rolling6" aria-pressed="false">Rolling 6 mo</button>
           <button data-dn="monthly" aria-pressed="false">Monthly</button>
         </div>
       </div>
@@ -357,7 +311,6 @@
       <div class="controls inner">
         <div class="seg" role="group" aria-label="Calculation, night-time price" id="seg-dn2">
           <button data-dn="rolling" aria-pressed="true">Rolling 12 mo</button>
-          <button data-dn="rolling6" aria-pressed="false">Rolling 6 mo</button>
           <button data-dn="monthly" aria-pressed="false">Monthly</button>
         </div>
       </div>
@@ -387,27 +340,10 @@
     </div>
 
     <div class="chart-block">
-      <h2>Key figures</h2>
-      <p class="sub">The uplift shows capture price compared with the solar park without a battery. Share via battery is the part of production that is charged into the battery, and cycles is discharged energy divided by battery capacity.</p>
-      <div class="data-table-wrap" id="solar-table"></div>
-    </div>
-
-    <div class="controls">
-      <label class="sel">Zone for the charts below
-        <select id="sel-solzone"></select>
-      </label>
-    </div>
-
-    <div class="chart-block">
-      <h2 id="solar-monthly-title">Month by month</h2>
-      <p class="sub">Capture rate per month for the selected zone.</p>
-      <div class="chart" id="chart-solar-monthly"></div>
-    </div>
-
-    <div class="chart-block">
       <h2 id="solar-day-title">Example day</h2>
       <p class="sub">A typical day: the one with median production in the chosen month. Shows solar production, what is delivered after the battery, and the day-ahead price (right axis).</p>
       <div class="controls inner">
+        <label class="sel">Zone <select id="sel-solzone"></select></label>
         <label class="sel">Month <select id="sel-solmonth"></select></label>
         <div class="seg" role="group" aria-label="Battery" id="seg-solscn">
           <button data-scn="1h" aria-pressed="false">1 h</button>
@@ -416,98 +352,6 @@
         </div>
       </div>
       <div class="chart" id="chart-solar-day"></div>
-    </div>
-  </section>
-
-  <!-- Arbitragedjup -->
-  <section class="panel" id="panel-depth" hidden>
-    <p class="note alert" id="note-depth"></p>
-    <div class="chart-block">
-      <h2>How many batteries can the arbitrage market take?</h2>
-      <p class="sub">Model of day-ahead arbitrage as more batteries enter. The fleet charges and discharges in the day's cheapest and most expensive hours, and that moves the price itself. At what fleet size does revenue per MW fall, and how much does the spread shrink? It depends on how sensitive the price is. That is estimated from historical load, wind, solar and price (see further down), or you can set it yourself.<sup><a href="#n12">12</a>, <a href="#n13">13</a></sup></p>
-      <div class="controls inner">
-        <div class="seg" role="group" aria-label="Battery duration" id="seg-depthdur">
-          <button data-ddur="1h" aria-pressed="false">1 h</button>
-          <button data-ddur="2h" aria-pressed="true">2 h</button>
-          <button data-ddur="4h" aria-pressed="false">4 h</button>
-        </div>
-        <div class="seg" role="group" aria-label="Fleet size on the x-axis" id="seg-depthmax">
-          <button data-dmax="5" aria-pressed="false">0–5 GW</button>
-          <button data-dmax="10" aria-pressed="true">0–10 GW</button>
-          <button data-dmax="20" aria-pressed="false">0–20 GW</button>
-        </div>
-      </div>
-      <div class="controls inner">
-        <div class="seg" role="group" aria-label="Source of price impact" id="seg-depthmode">
-          <button data-dmode="est" aria-pressed="true">Estimated from data</button>
-          <button data-dmode="manual" aria-pressed="false">Manual</button>
-        </div>
-      </div>
-      <div class="slider-row">
-        <label for="rng-depth">Price impact</label>
-        <input type="range" id="rng-depth" min="0.5" max="60" step="0.5" value="15" aria-describedby="depth-help">
-        <output id="depth-s-label"></output>
-        <div class="seg" role="group" aria-label="Presets" id="seg-depthpre">
-          <button data-dpre="5" id="pre-low">Lowest</button>
-          <button data-dpre="15" id="pre-mid">Median</button>
-          <button data-dpre="40" id="pre-high">Highest</button>
-        </div>
-      </div>
-      <p class="note" id="depth-help"></p>
-      <p class="note alert" id="depth-est-note"></p>
-    </div>
-
-    <div class="chart-block">
-      <h2>Revenue per MW and year, by fleet size</h2>
-      <p class="sub">Thousand euro per installed MW and year from day-ahead arbitrage. The diamond marks where revenue has halved compared with the first MW.</p>
-      <div class="chart" id="chart-depth-rev"></div>
-    </div>
-
-    <div class="chart-block">
-      <h2>Daily spread after the batteries</h2>
-      <p class="sub">Average difference between the day's highest and lowest hourly price in euro per megawatt-hour, once the fleet has done its job.</p>
-      <div class="chart" id="chart-depth-spread"></div>
-    </div>
-
-    <div class="chart-block">
-      <h2>Saturation points</h2>
-      <p class="sub">Fleet size (in GW) where revenue per MW has fallen to 75, 50 and 25 % of the first MW's revenue, at the chosen price impact.</p>
-      <div class="data-table-wrap" id="depth-table"></div>
-      <p class="note" id="note-depth-ref"></p>
-    </div>
-
-    <div class="chart-block">
-      <h2>Empirical basis: how much does the price move per GW?</h2>
-      <p class="sub">The estimate compares the hourly price with residual load (consumption minus wind and solar) over the last 24 months, accounting for month and hour of day. Wind and weather make residual load vary on its own, and the price follows. That is the same thing a battery does when it charges or discharges.<sup><a href="#n14">14</a>, <a href="#n15">15</a></sup></p>
-      <div class="data-table-wrap" id="slope-table"></div>
-      <p class="note" id="note-slope"></p>
-    </div>
-
-    <div class="chart-block">
-      <h2>The relationship between price and residual load</h2>
-      <p class="sub">Average price deviation (euro per MWh) for twenty equally sized groups of hours sorted by residual load (GW, deviation from normal for the month and time of day). The dots show whether the relationship is straight, and the dashed line is the estimated slope.</p>
-      <div class="chart" id="chart-slope-bins"></div>
-    </div>
-
-    <div class="chart-block">
-      <h2>Price impact over the day</h2>
-      <p class="sub">The same estimate split by time of day, with 95 % intervals. Batteries usually charge at night and in the middle of the day and discharge in the evening.</p>
-      <div class="chart" id="chart-slope-dayparts"></div>
-    </div>
-  </section>
-
-  <!-- Senaste dygnen -->
-  <section class="panel" id="panel-recent" hidden>
-    <div class="chart-block">
-      <h2>Day-ahead price, last two weeks</h2>
-      <p class="sub">Euro per megawatt-hour, hourly values in Swedish time.<sup><a href="#n5">5</a></sup></p>
-      <div class="chart" id="chart-hourly"></div>
-    </div>
-    <div class="chart-block">
-      <h2>Wind and solar production</h2>
-      <p class="sub">Average power per hour in megawatts.<sup><a href="#n4">4</a></sup></p>
-      <div class="chart" id="chart-prod"></div>
-      <p class="note" id="note-prod"></p>
     </div>
   </section>
 
@@ -540,7 +384,7 @@
       <dd>Capture price divided by the average price, in percent. 100 % means the technology received a price equal to the average, and lower values mean production falls in hours with lower prices than average.</dd>
 
       <dt>Rolling 12 months</dt>
-      <dd>The same calculation over the latest twelve months in one go, weighted by production. It is not an average of twelve monthly ratios. The Duck curve tab also offers rolling 6 months for daytime and night-time prices. The dashed line then shows the same period a year earlier (for rolling 12 months that means months 13–24 back), so that you can see the change compared with the year before.</dd>
+      <dd>The same calculation over the latest twelve months in one go, weighted by production. It is not an average of twelve monthly ratios. In the Duck curve tab, a dashed line shows the same measure twelve months earlier (months 13–24 back), so that you can see the change compared with the year before.</dd>
 
       <dt>Daily spread</dt>
       <dd>The difference between the day's highest and lowest hourly price, in EUR/MWh. Shown as an average over the days of the month, or rolling over twelve months.</dd>
@@ -553,15 +397,6 @@
 
       <dt>Solar park + BESS</dt>
       <dd>A calculation for a fictional 1 MWp solar park with a battery (BESS). The battery shifts production each day from the cheapest to the most expensive hours. "1 h", "2 h" and "4 h" state how long the battery can deliver at full power.</dd>
-
-      <dt>Share via battery and cycles</dt>
-      <dd>Share via battery is the part of the solar park's production that is charged into the battery. Cycles is the energy discharged during the period divided by the battery's capacity, that is, the number of full cycles.</dd>
-
-      <dt>Arbitrage depth</dt>
-      <dd>How large a battery fleet the day-ahead market can absorb before arbitrage stops paying. The saturation point is the fleet size at which revenue per MW has fallen to a given share of the first MW's revenue.</dd>
-
-      <dt>Price impact</dt>
-      <dd>How many euro per megawatt-hour the price moves when a 1 GW fleet charges (price rises) or discharges (price falls) at full power. It is the model's most important and most uncertain assumption.</dd>
 
       <dt>Duck curve</dt>
       <dd>The shape of the price over the day. When a lot of solar power is produced in the middle of the day the price is pushed down, while the evening becomes more expensive when the sun disappears. The curve then resembles a duck seen from the side.</dd>
@@ -579,10 +414,6 @@
       <li id="n9"><strong>The solar park.</strong> Production is calculated with PVGIS for 1 MWp of crystalline silicon in Halmstad (56.7° N, 12.9° E), 30° tilt, facing due south and 14 % system losses. The profile comes from a historical weather year and is placed on the same dates over the last twelve months. It therefore does not follow the actual weather. In reality the price often falls when it is sunny, so the capture rate for a real park is likely somewhat lower than here. Halmstad is in SE4, and the other zones are shown as hypothetical comparisons with the same production profile.</li>
       <li id="n10"><strong>The battery model.</strong> The battery's power equals the park's peak power (1 MW per MWp). Duration is 1, 2 or 4 hours and round-trip efficiency 88 %. The battery is charged only from the solar park, never from the grid, and is empty at the end of the day. For each day the charging and discharging hours that give the highest revenue are chosen, with knowledge of all the day's day-ahead prices in advance. Production is not curtailed, and losses in the battery count as sold energy that does not materialise.</li>
       <li id="n11"><strong>Capture price with battery</strong> is revenue divided by the solar park's production, including battery losses. Capture rate is capture price divided by the zone's average price over the same period. The calculation does not include grid fees, balancing costs, intraday trading, ancillary services, degradation or investment costs and should be seen as an illustration of the price value in the day-ahead market.</li>
-      <li id="n12"><strong>The arbitrage depth model.</strong> The fleet consists of identical batteries with power N and duration 1, 2 or 4 hours, 88 % round-trip efficiency, and charges only from the grid. The batteries are price takers with perfect foresight of the day's day-ahead prices, and are empty at the end of the day. The price in that hour is shifted linearly with the fleet's net flow (price impact in euro per MWh and GW). Because the batteries push the price up when they charge and down when they discharge, revenue per MW falls as the fleet grows. The calculation is based on hourly prices for every fourth day over the last 12 months, scaled up to a year.</li>
-      <li id="n13"><strong>Limitations.</strong> The result depends entirely on the price impact. The model has a single price level per zone and does not account for trade with neighbouring zones that dilutes the effect, for supply and demand changing over time, or for batteries also selling in intraday and ancillary service markets. It does not include grid fees, operations, degradation or investment costs. It shows an upper limit for what day-ahead arbitrage yields, and not what an individual installation will earn.</li>
-      <li id="n14"><strong>How price impact is estimated.</strong> For each zone a regression of hourly price on residual load (consumption minus wind and solar, in GW) is run over the last 24 months, with fixed effects for month (which captures fuel prices and hydrology) and for hour of day split into weekdays and weekends. Prices are capped at the 1st–99th percentile so that single spikes do not dominate. Standard errors are cluster-robust by week. Because weather co-varies between zones and the zones are priced together, four variants are run: own residual load only, with Germany as a control, with all other zones as controls (the main estimate, including the five Norwegian zones), and the same on only the latest 12 months. The bands in the charts span the three controlled variants, and the variant without controls is shown only for comparison because it comes out too high.</li>
-      <li id="n15"><strong>What the estimate does not show.</strong> It measures how the price has moved given the variations in residual load that have actually occurred, often a few hundred MW up to about a GW in a Swedish zone. A battery fleet of several GW lies outside that range, and the line is then an extrapolation. When the batteries fill up the interconnectors to neighbouring zones, the zones decouple and the price becomes more sensitive, so real saturation may come faster than a straight line suggests. The relationship is also affected by things that are not included, for example flows, nuclear outages and hydrology.</li>
       <li id="n16"><strong>Consumption.</strong> ENTSO-E's reported actual total load per bidding zone, aggregated to hourly values and summed over twelve months. Months with fewer than 90 % of the hours reported are left out, so a rolling 12-month figure requires twelve complete months. The grid operators may revise the data afterwards.</li>
     </ol>
 
@@ -597,12 +428,11 @@
   'use strict';
 
   var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var state = { zone: 'SE3', tab: 'overview', tech: 'wind', showBase: false, view: 'monthly', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', depthDur: '2h', depthS: 15, depthMax: 10, depthMode: 'est' };
-  var DATA = null, RECENT = null;
+  var state = { zone: 'SE3', tab: 'overview', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', };
+  var DATA = null;
 
   var qs = new URLSearchParams(location.search);
-  if (qs.get('zone')) state.zone = qs.get('zone').toUpperCase();
-  if (['overview', 'capture', 'duck', 'solar', 'depth', 'recent'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
+  if (['overview', 'duck', 'solar'].indexOf(qs.get('tab')) >= 0) state.tab = qs.get('tab');
 
   function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   function $(id) { return document.getElementById(id); }
@@ -641,30 +471,6 @@
   }
   var CONFIG = { displayModeBar: false, responsive: true };
 
-  /* ---------- Övre delen ---------- */
-  function renderZones() {
-    var box = $('zones');
-    box.innerHTML = '';
-    DATA.order.forEach(function (key) {
-      var b = document.createElement('button');
-      b.textContent = key;
-      b.title = DATA.zones[key].name;
-      b.setAttribute('aria-pressed', String(key === state.zone));
-      b.addEventListener('click', function () { state.zone = key; renderAll(); });
-      box.appendChild(b);
-    });
-  }
-
-  function renderKpis(z) {
-    var wr = lastValue(z.wind.r_rate), sr = lastValue(z.solar.r_rate);
-    var sp = lastValue(z.spread.spread_mean);
-    var lastMonth = label(z.months[z.months.length - 1]);
-    $('kpis').innerHTML =
-      '<div class="kpi wind"><dt>Wind, rolling 12 mo</dt><dd>' + (wr == null ? '–' : fmt(wr * 100) + ' %') + '</dd></div>' +
-      '<div class="kpi solar"><dt>Solar, rolling 12 mo</dt><dd>' + (sr == null ? '–' : fmt(sr * 100) + ' %') + '</dd></div>' +
-      '<div class="kpi spread"><dt>Average daily spread, ' + lastMonth + '</dt><dd>' + fmt(sp) + ' <small>€/MWh</small></dd></div>';
-  }
-
   /* ---------- Gemensam y-axel för alla områden ---------- */
   function globalExtent(getter) {
     var lo = Infinity, hi = -Infinity;
@@ -693,46 +499,6 @@
     Object.assign(ax, extra || {});
     if (range) { ax.range = range; ax.autorange = false; }
     return ax;
-  }
-
-  /* ---------- Flik: Capture rate ---------- */
-  function renderCapture() {
-    var tech = state.tech, rolling = state.view === 'rolling';
-    var techName = tech === 'wind' ? 'wind' : 'solar';
-    var xs = tail(ALLM, state.range).map(label);
-    var rateBy = {}, priceBy = {}, baseBy = {};
-    DATA.order.forEach(function (k) {
-      var zz = DATA.zones[k], t = zz[tech];
-      rateBy[k] = tail(zoneVals(zz, pct(rolling ? t.r_rate : t.rate), ALLM), state.range);
-      priceBy[k] = tail(zoneVals(zz, rolling ? t.r_price : t.price, ALLM), state.range);
-      baseBy[k] = tail(zoneVals(zz, rolling ? zz.r_base : zz.base, ALLM), state.range);
-    });
-    var rateLists = DATA.order.map(function (k) { return rateBy[k]; });
-    var priceLists = DATA.order.map(function (k) { return priceBy[k]; }).concat(DATA.order.map(function (k) { return baseBy[k]; }));
-    var rateRange = niceRange(extentOf(rateLists), true, 110);
-    var priceRange = niceRange(extentOf(priceLists), true);
-    var mode = rolling ? 'lines' : 'lines+markers';
-    var suffix = rolling ? ', rolling 12 months' : ' per month';
-    var none = !selectedZones().length;
-    $('note-nozones-c').textContent = none ? 'Select at least one bidding zone in the panel above.' : '';
-
-    Plotly.react('chart-rate', zoneTraces({ cur: rateBy, prior: null }, xs, '%{y:.0f} %', '', mode), layout(xs, {
-      yaxis: yAxis({ ticksuffix: ' %' }, rateRange),
-      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }]
-    }), CONFIG);
-    $('rate-title').textContent = 'Capture rate, ' + techName + suffix;
-
-    Plotly.react('chart-price', zoneTraces({ cur: priceBy, prior: state.showBase ? baseBy : null }, xs, '%{y:.1f} €/MWh', 'average price', mode),
-      layout(xs, { yaxis: yAxis({ zeroline: true, zerolinecolor: css('--line'), ticksuffix: ' €' }, priceRange) }), CONFIG);
-    $('price-title').textContent = 'Capture price, ' + techName + suffix;
-
-    var notes = [];
-    var missing = selectedZones().filter(function (k) { return allNull(rateBy[k]); });
-    if (missing.length) notes.push('No ' + (tech === 'wind' ? 'wind' : 'solar') + ' production reported (or too incomplete) in ENTSO-E for: ' + missing.join(', ') + '.');
-    if (tech === 'solar' && !missing.length) notes.push('Solar production in Sweden is incompletely reported in ENTSO-E, so Denmark, Finland and Germany are better references.');
-    if (rolling) notes.push('Rolling 12 months requires twelve consecutive months of data, so the lines only start after a year of history.');
-    $('note-rate').textContent = notes.join(' ');
-    $('note-rate').className = 'note' + (missing.length ? ' alert' : '');
   }
 
   /* ---------- Flik: Duck curve ---------- */
@@ -901,13 +667,13 @@
       : '';
 
     /* 4 + 5. Dag- och nattpris, samma beräkningssätt och skala */
-    var dnWin = { rolling: 12, rolling6: 6, monthly: 0 }[state.dn];
+    var dnWin = { rolling: 12, monthly: 0 }[state.dn];
     var monthDays = function (zz) { return zoneVals(zz, zz.months.map(dim), ALLM); };
     var day = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 10, 14), ALLM); }, monthDays, dnWin);
     var night = trendSeries(function (zz) { return zoneVals(zz, hpMean(zz, 0, 4), ALLM); }, monthDays, dnWin);
     var dnRange = niceRange(extentOf(allLists(day).concat(allLists(night))), true);
     var dnLayout = function () { return layout(xs, { yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }, dnRange) }); };
-    var dnPrior = dnWin === 6 ? 'same period a year earlier' : '12 mo earlier';
+    var dnPrior = '12 mo earlier';
     Plotly.react('chart-day', zoneTraces(day, xs, '%{y:.1f} €/MWh', dnPrior), dnLayout(), CONFIG);
     Plotly.react('chart-night', zoneTraces(night, xs, '%{y:.1f} €/MWh', dnPrior), dnLayout(), CONFIG);
     var dnText = dnWin ? ', rolling ' + dnWin + ' months' : ' per month';
@@ -915,9 +681,7 @@
     $('night-title').textContent = 'Night-time price 00:00–04:00' + dnText;
     $('note-dn').textContent = dnWin === 12
       ? 'Rolling 12 months is an average over the latest twelve months, weighted by the number of days. The dashed line shows the same measure twelve months earlier (months 13–24).'
-      : dnWin === 6
-        ? 'Rolling 6 months is an average over the latest six months, weighted by the number of days. The dashed line shows the same six-month period a year earlier. The lines start after six months of history, and the dashed ones after eighteen.'
-        : '';
+      : '';
   }
 
   /* ---------- Flik: Solpark + BESS ---------- */
@@ -964,38 +728,11 @@
     Plotly.react('chart-solar-price', bars('cp', 1, function (v) { return v == null ? '' : fmt(v) + ' €'; }, '%{y:.1f} €/MWh'),
       layout(xl, { barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' €' }, priceRange) }), CONFIG);
 
-    /* 3. Nyckeltal */
-    var html = '<table class="data-table"><thead><tr><th>Zone</th><th>Scenario</th><th>Capture price</th><th>Capture rate</th><th>Uplift</th><th>Via battery</th><th>Cycles</th></tr></thead><tbody>';
-    zones.forEach(function (k) {
-      var t = SOLAR.zones[k].total, base = t.none.cp;
-      SC.forEach(function (sc, i) {
-        var e = t[sc], up = (sc !== 'none' && e.cp != null && base != null) ? e.cp - base : null;
-        html += '<tr' + (i === 0 ? ' class="first"' : '') + '><td>' + (i === 0 ? '<strong>' + k + '</strong>' : '') + '</td><td>' + SC_NAME[sc] + '</td>' +
-          '<td>' + (e.cp == null ? '–' : fmt(e.cp, 1) + ' €') + '</td>' +
-          '<td>' + (e.cr == null ? '–' : fmt(e.cr * 100) + ' %') + '</td>' +
-          '<td' + (up != null && up > 0 ? ' class="pos"' : '') + '>' + (up == null ? '–' : '+' + fmt(up, 1) + ' € (' + fmt(up / base * 100) + ' %)') + '</td>' +
-          '<td>' + (e.share == null ? '–' : fmt(e.share * 100) + ' %') + '</td>' +
-          '<td>' + (e.cycles == null ? '–' : fmt(e.cycles)) + '</td></tr>';
-      });
-    });
-    $('solar-table').innerHTML = html + '</tbody></table>';
-
-    /* 4. Valt område: månad för månad + exempeldag */
+    /* Exempeldag för valt område */
     var keys = Object.keys(SOLAR.zones);
     if (!SOLAR.zones[state.solZone]) state.solZone = keys[0];
     $('sel-solzone').innerHTML = keys.map(function (k) { return '<option value="' + k + '"' + (k === state.solZone ? ' selected' : '') + '>' + SOLAR.zones[k].name + '</option>'; }).join('');
     var zs = SOLAR.zones[state.solZone];
-    var mx = zs.monthly.months.map(label);
-    var allMonthly = [];
-    keys.forEach(function (k) { SC.forEach(function (sc) { allMonthly.push(SOLAR.zones[k].monthly[sc].cr.map(function (v) { return v == null ? null : v * 100; })); }); });
-    var mRange = niceRange(extentOf(allMonthly), true, 110);
-    Plotly.react('chart-solar-monthly', SC.map(function (sc) {
-      return { type: 'scatter', mode: 'lines+markers', name: SC_NAME[sc], x: mx, connectgaps: false,
-               y: zs.monthly[sc].cr.map(function (v) { return v == null ? null : v * 100; }),
-               line: { color: SC_COLOR[sc], width: sc === 'none' ? 2.2 : 2.8, dash: sc === 'none' ? 'dot' : 'solid' }, marker: { size: 5 }, hovertemplate: '%{y:.0f} %' };
-    }), layout(mx, { yaxis: yAxis({ ticksuffix: ' %' }, mRange),
-      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: 'y', y0: 100, y1: 100, line: { color: css('--muted'), width: 1.2, dash: 'dash' } }] }), CONFIG);
-    $('solar-monthly-title').textContent = 'Month by month, ' + zs.name;
 
     var ex = zs.examples || [];
     if (!ex.length) { return; }
@@ -1019,154 +756,6 @@
       yaxis2: { overlaying: 'y', side: 'right', range: [pmin, pmax], ticksuffix: ' €', showgrid: false, zeroline: false, fixedrange: true }
     }), CONFIG);
     $('solar-day-title').textContent = 'Example day ' + e.date + ', ' + zs.name;
-  }
-
-  /* ---------- Flik: Arbitragedjup ---------- */
-  var DEPTH = null, SLOPE = null;
-  var DP_EN = { natt: 'Night', morgon: 'Morning', dag: 'Midday', 'kväll': 'Evening', night: 'Night', morning: 'Morning', day: 'Midday', evening: 'Evening' };
-
-  function interpK(xs, ys, x) {
-    if (x <= xs[0]) return ys[0];
-    for (var i = 1; i < xs.length; i++) {
-      if (x <= xs[i]) { var t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]); return ys[i - 1] + t * (ys[i] - ys[i - 1]); }
-    }
-    return null;                                   // utanför det beräknade intervallet: rita inget
-  }
-  function depthCurve(zone, field, s, grid) {
-    var r = DEPTH.zones[zone].res[state.depthDur][field];
-    return grid.map(function (n) { return interpK(DEPTH.kappa, r, s * n); });
-  }
-  /* flottstorlek (GW) där intäkten per MW har fallit till andelen frac av första MW */
-  function saturationAt(zone, s, frac) {
-    var r = DEPTH.zones[zone].res[state.depthDur].rev, target = r[0] * frac;
-    if (!(r[0] > 0)) return null;
-    for (var i = 1; i < r.length; i++) {
-      if (r[i] <= target) {
-        var t = (r[i - 1] - target) / (r[i - 1] - r[i]);
-        return (DEPTH.kappa[i - 1] + t * (DEPTH.kappa[i] - DEPTH.kappa[i - 1])) / s;
-      }
-    }
-    return null;
-  }
-  function slopeFor(k) {
-    var e = SLOPE && SLOPE.zones[k];
-    if (!e) return null;
-    var c = e[e.central];
-    if (!c) return null;
-    var band = e.band || { lo: c.lo, hi: c.hi };
-    return { c: Math.max(c.b, 0.05), lo: Math.max(Math.min(band.lo, c.lo), 0.05), hi: Math.max(band.hi, c.hi, 0.05), flat: band.lo <= 0.05, raw: c };
-  }
-  function rgba(hex, a) {
-    var n = parseInt(hex.slice(1), 16);
-    return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
-  }
-  function pushBand(arr, k, color, upper, lower, grid) {
-    arr.push({ type: 'scatter', mode: 'lines', x: grid, y: upper, line: { width: 0, color: color }, legendgroup: k, showlegend: false, hoverinfo: 'skip' });
-    arr.push({ type: 'scatter', mode: 'lines', x: grid, y: lower, line: { width: 0, color: color }, fill: 'tonexty', fillcolor: rgba(color, 0.18), legendgroup: k, showlegend: false, hoverinfo: 'skip' });
-  }
-
-  function renderDepth() {
-    var note = $('note-depth');
-    if (!DEPTH) {
-      note.textContent = 'This tab needs newer data. Upload the new update_data.py to GitHub and run the workflow again. The calculation takes a while the first time.';
-      return;
-    }
-    var zones = selectedZones().filter(function (k) { return DEPTH.zones[k]; });
-    note.textContent = zones.length ? '' : 'Select at least one bidding zone in the panel above.';
-    var est = state.depthMode === 'est' && !!SLOPE;
-    var s = state.depthS, maxN = state.depthMax, dur = state.depthDur;
-    $('rng-depth').value = String(s);
-    $('rng-depth').disabled = est;
-    $('depth-s-label').textContent = est ? 'estimated per zone' : fmt(s, 1) + ' €/MWh per GW';
-    $('depth-help').textContent = est
-      ? 'Price impact is estimated per zone from historical load, wind, solar and price (see Empirical basis further down). The shaded band spans the model variants (95 % intervals). The estimate is based on variations in residual load of limited size, so large fleets are an extrapolation.'
-      : 'Price impact is how many euro per megawatt-hour the price moves when a 1 GW fleet charges or discharges at full power. A low value is a deep market that can take many batteries, and a high value is a shallow market that saturates quickly. The presets are the lowest, middle and highest estimated values among the zones. The shape of the curve is more reliable than the exact GW figure.';
-    if (!SLOPE) $('depth-est-note').textContent = 'The estimate is not available yet (it requires consumption data from ENTSO-E). Run the workflow again and it will appear. Until then the slider applies.';
-    else $('depth-est-note').textContent = '';
-
-    if (SLOPE) {
-      var cs = Object.keys(SLOPE.zones).map(function (k) { return SLOPE.zones[k][SLOPE.zones[k].central].b; }).filter(function (v) { return v > 0; }).sort(function (a, b) { return a - b; });
-      if (cs.length) {
-        var med = cs.length % 2 ? cs[(cs.length - 1) / 2] : (cs[cs.length / 2 - 1] + cs[cs.length / 2]) / 2;
-        var setPre = function (id, v, t) { var b = $(id); b.dataset.dpre = String(Math.round(v * 2) / 2); b.textContent = t + ' (' + fmt(v, 1) + ')'; };
-        setPre('pre-low', cs[0], 'Lowest'); setPre('pre-mid', med, 'Median'); setPre('pre-high', cs[cs.length - 1], 'Highest');
-      }
-    }
-    var grid = [];
-    for (var i = 0; i <= 80; i++) grid.push(maxN * i / 80);
-    var all = Object.keys(DEPTH.zones);
-    var rev0Max = Math.max.apply(null, all.map(function (k) { return DEPTH.zones[k].res[dur].rev[0]; }));
-    var spr0Max = Math.max.apply(null, all.map(function (k) { return DEPTH.zones[k].spread0; }));
-    var xaxis = { type: 'linear', range: [0, maxN], ticksuffix: ' GW', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true };
-
-    var revTr = [], sprTr = [], noEst = [], used = {};
-    zones.forEach(function (k) {
-      var c = ZONE_COLORS[k] || '#888', zz = DEPTH.zones[k];
-      var sl = est ? slopeFor(k) : null;
-      if (est && !sl) noEst.push(k);
-      var sc = sl ? sl.c : s;
-      used[k] = { c: sc, lo: sl ? sl.lo : sc, hi: sl ? sl.hi : sc, sl: sl };
-      if (sl) {
-        pushBand(revTr, k, c, depthCurve(k, 'rev', sl.lo, grid), depthCurve(k, 'rev', sl.hi, grid), grid);
-        pushBand(sprTr, k, c, depthCurve(k, 'spread', sl.lo, grid), depthCurve(k, 'spread', sl.hi, grid), grid);
-      }
-      revTr.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: grid, y: depthCurve(k, 'rev', sc, grid), line: { color: c, width: 2.8 }, hovertemplate: '%{y:.0f} k€/MW' });
-      var n50 = saturationAt(k, sc, 0.5);
-      if (n50 != null && n50 <= maxN) revTr.push({ type: 'scatter', mode: 'markers', name: k + ' (halved)', legendgroup: k, showlegend: false, x: [n50], y: [zz.res[dur].rev[0] * 0.5],
-        marker: { symbol: 'diamond', size: 11, color: c, line: { color: css('--ink'), width: 1.5 } }, hovertemplate: 'Revenue halved at %{x:.1f} GW<extra>' + k + '</extra>' });
-      sprTr.push({ type: 'scatter', mode: 'lines', name: k, legendgroup: k, x: grid, y: depthCurve(k, 'spread', sc, grid), line: { color: c, width: 2.8 }, hovertemplate: '%{y:.0f} €/MWh' });
-    });
-    if (noEst.length) $('depth-est-note').textContent = 'No estimate for ' + noEst.join(', ') + ', where the slider (' + fmt(s, 1) + ' €/MWh per GW) is used instead.';
-    Plotly.react('chart-depth-rev', revTr, layout(grid, { xaxis: xaxis, hovermode: 'x unified', yaxis: yAxis({ ticksuffix: ' k€' }, niceRange([0, rev0Max * 1.06], true)) }), CONFIG);
-    Plotly.react('chart-depth-spread', sprTr, layout(grid, { xaxis: xaxis, hovermode: 'x unified', yaxis: yAxis({ ticksuffix: ' €' }, niceRange([0, spr0Max * 1.06], true)) }), CONFIG);
-
-    /* mättnadspunkter, med osäkerhetsintervall när prispåverkan är skattad */
-    var maxK = DEPTH.kappa[DEPTH.kappa.length - 1];
-    var gw = function (n, sv) { return n == null ? '&gt; ' + fmt(maxK / sv) : fmt(n, n < 1 ? 2 : 1); };
-    var cell = function (k, f) {
-      var u = used[k], c = saturationAt(k, u.c, f);
-      if (!u.sl) return gw(c, u.c) + ' GW';
-      return gw(c, u.c) + ' GW <span style="color:var(--muted)">(' + gw(saturationAt(k, u.hi, f), u.hi) + '–' + gw(saturationAt(k, u.lo, f), u.lo) + ')</span>';
-    };
-    var html = '<table class="data-table"><thead><tr><th>Zone</th><th>Price impact</th><th>First MW (k€/yr)</th><th>Daily spread today</th><th>75 % left</th><th>50 % left</th><th>25 % left</th></tr></thead><tbody>';
-    zones.forEach(function (k) {
-      var zz = DEPTH.zones[k], u = used[k];
-      html += '<tr><td><strong>' + k + '</strong></td><td>' + fmt(u.c, 1) + (u.sl ? ' <span style="color:var(--muted)">(' + fmt(u.lo, 1) + '–' + fmt(u.hi, 1) + ')</span>' : '') + '</td><td>' + fmt(zz.res[dur].rev[0]) + '</td><td>' + fmt(zz.spread0) + ' €</td><td>' + cell(k, 0.75) + '</td><td>' + cell(k, 0.5) + '</td><td>' + cell(k, 0.25) + '</td></tr>';
-    });
-    $('depth-table').innerHTML = html + '</tbody></table>';
-    $('note-depth-ref').textContent = 'Parentheses show the range of the price-impact estimate across model variants, and hence the range for the saturation point. For context: according to Aurora Energy Research, Sweden passed 1 GW of batteries in operation in the first quarter of 2025, with 2.8 GW as the target for 2028. Much of that capacity sells ancillary services rather than arbitrage, and the capacity is spread over several bidding zones.';
-
-    renderSlopeEvidence(zones);
-  }
-
-  function renderSlopeEvidence(zones) {
-    var tbl = $('slope-table'), nt = $('note-slope');
-    if (!SLOPE) { tbl.innerHTML = ''; nt.textContent = 'The evidence is not available yet. Run the workflow again after uploading the new update_data.py.'; return; }
-    var fz = zones.filter(function (k) { return SLOPE.zones[k]; });
-    var f = function (o) { return o ? fmt(o.b, 1) + ' <span style="color:var(--muted)">(' + fmt(o.lo, 1) + '–' + fmt(o.hi, 1) + ')</span>' : '–'; };
-    var html = '<table class="data-table"><thead><tr><th>Zone</th><th>Main estimate</th><th>Range across model variants</th><th>Own residual load only</th><th>Controlling for Germany</th><th>Controlling for all zones</th><th>Observed residual load (5–95 %)</th><th>Hours</th></tr></thead><tbody>';
-    fz.forEach(function (k) {
-      var e = SLOPE.zones[k], c = e[e.central], bd = e.band || { lo: c.lo, hi: c.hi };
-      html += '<tr><td><strong>' + k + '</strong></td><td>' + f(c) + '</td><td>' + fmt(bd.lo, 1) + '–' + fmt(bd.hi, 1) + (bd.lo <= 0 ? ' *' : '') + '</td><td>' + f(e.a) + '</td><td>' + (e.b ? f(e.b) : 'own reference') + '</td><td>' + (e.c ? f(e.c) : '–') + '</td><td>' + fmt(e.rl_range[0], 1) + ' to +' + fmt(e.rl_range[1], 1) + ' GW</td><td>' + fmt(e.n) + '</td></tr>';
-    });
-    tbl.innerHTML = html + '</tbody></table>';
-    nt.textContent = 'Euro per MWh and GW. The main estimate controls for residual load in all other zones we have data for (including Norway). The range is the lowest and highest 95 % interval among the three controlled variants, and own residual load only is often too high. The estimate applies to variations of the size shown furthest right, and larger fleets are an extrapolation. * The range includes zero.';
-
-    var binTr = [], dpTr = [];
-    fz.forEach(function (k) {
-      var e = SLOPE.zones[k], c = ZONE_COLORS[k] || '#888', b = e[e.central].b;
-      binTr.push({ type: 'scatter', mode: 'markers', name: k, legendgroup: k, x: e.bins.x, y: e.bins.y, marker: { color: c, size: 7 }, hovertemplate: '%{y:.1f} € at %{x:.2f} GW' });
-      var xs = [e.bins.x[0], e.bins.x[e.bins.x.length - 1]];
-      binTr.push({ type: 'scatter', mode: 'lines', name: k + ' (slope)', legendgroup: k, showlegend: false, x: xs, y: xs.map(function (x) { return b * x; }), line: { color: c, width: 1.8, dash: 'dot' }, hoverinfo: 'skip' });
-      var names = Object.keys(SLOPE.dayparts), vals = names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].b : null; });
-      dpTr.push({ type: 'bar', name: k, x: names.map(function (n) { return DP_EN[n] || (n.charAt(0).toUpperCase() + n.slice(1)); }), y: vals, marker: { color: c },
-        error_y: { type: 'data', symmetric: false, thickness: 1.3, width: 3,
-                   array: names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].hi - e.dayparts[n].b : 0; }),
-                   arrayminus: names.map(function (n) { return e.dayparts[n] ? e.dayparts[n].b - e.dayparts[n].lo : 0; }) },
-        hovertemplate: '%{y:.1f} €/MWh per GW' });
-    });
-    Plotly.react('chart-slope-bins', binTr, layout(['x'], { xaxis: { type: 'linear', ticksuffix: ' GW', gridcolor: css('--line'), zeroline: true, zerolinecolor: css('--line'), fixedrange: true }, hovermode: 'closest', yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }) }), CONFIG);
-    Plotly.react('chart-slope-dayparts', dpTr, layout(['x'], { xaxis: { type: 'category', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true }, barmode: 'group', bargap: 0.25, yaxis: yAxis({ ticksuffix: ' €', zeroline: true, zerolinecolor: css('--line') }) }), CONFIG);
   }
 
   /* ---------- Tab: Overview ---------- */
@@ -1246,34 +835,6 @@
     $('ov-note').textContent = 'Arrows compare the latest 12 months with the 12 months before and show direction only, not whether a change is good or bad. See the definitions below.';
   }
 
-  /* ---------- Flik: Pris och produktion ---------- */
-  function renderRecent() {
-    var r = RECENT.zones[state.zone];
-    if (!r) return;
-    var xs = r.t;
-    var lo = Infinity, hi = -Infinity;
-    Object.keys(RECENT.zones).forEach(function (k) {
-      RECENT.zones[k].price.forEach(function (v) { if (v == null) return; if (v < lo) lo = v; if (v > hi) hi = v; });
-    });
-    var priceRange = lo === Infinity ? null : niceRange([lo, hi], true);
-    var xaxis = { type: 'date', gridcolor: 'rgba(0,0,0,0)', linecolor: css('--line'), fixedrange: true, tickformat: '%-d %b' };
-
-    Plotly.react('chart-hourly', [
-      { type: 'scatter', mode: 'lines', name: 'Price', x: xs, y: r.price, line: { color: css('--ink'), width: 1.8, shape: 'hv' }, hovertemplate: '%{y:.1f} €/MWh' }
-    ], layout(xs, { showlegend: false, xaxis: xaxis, yaxis: yAxis({ zeroline: true, zerolinecolor: css('--muted'), ticksuffix: ' €' }, priceRange) }), CONFIG);
-
-    Plotly.react('chart-prod', [
-      { type: 'scatter', mode: 'lines', name: 'Wind', x: xs, y: r.wind, stackgroup: 'p', line: { color: css('--wind'), width: 0.8 }, fillcolor: 'rgba(27,127,158,0.55)', hovertemplate: '%{y:.0f} MW' },
-      { type: 'scatter', mode: 'lines', name: 'Solar', x: xs, y: r.solar, stackgroup: 'p', line: { color: css('--solar'), width: 0.8 }, fillcolor: 'rgba(226,154,14,0.6)', hovertemplate: '%{y:.0f} MW' }
-    ], layout(xs, { xaxis: xaxis, yaxis: yAxis({ ticksuffix: ' MW' }) }), CONFIG);
-    var missing = [];
-    if (allNull(r.solar)) missing.push('solar');
-    if (allNull(r.wind)) missing.push('wind');
-    var msg = 'The production axis is scaled to each zone because volumes differ greatly.';
-    if (missing.length) msg = 'No reported production of ' + missing.join(' and ') + ' in recent days for this zone. ' + msg;
-    $('note-prod').textContent = msg;
-  }
-
   /* ---------- Samordning ---------- */
   function setPressed(containerId, attr, value) {
     Array.prototype.forEach.call($(containerId).querySelectorAll('button'), function (b) {
@@ -1282,28 +843,16 @@
   }
 
   function renderAll() {
-    var z = DATA.zones[state.zone];
-    if (!z) { state.zone = DATA.order[0]; z = DATA.zones[state.zone]; }
-    renderZones();
-    renderKpis(z);
-    var multi = state.tab === 'capture' || state.tab === 'duck' || state.tab === 'solar' || state.tab === 'depth';
-    ['zones', 'kpis', 'axis-note'].forEach(function (id) { $(id).hidden = multi || state.tab === 'overview'; });
+    var multi = state.tab === 'duck' || state.tab === 'solar';
     $('zonebar').hidden = !multi;
     if (multi) renderZoneChips();
 
     Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
       b.setAttribute('aria-selected', String(b.dataset.tab === state.tab));
     });
-    ['overview', 'capture', 'duck', 'solar', 'depth', 'recent'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
+    ['overview', 'duck', 'solar'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
 
-    setPressed('seg-view', 'data-view', state.view);
-    setPressed('seg-range', 'data-range', state.range);
-    setPressed('seg-tech', 'data-tech', state.tech);
     setPressed('seg-solscn', 'data-scn', state.solScn);
-    setPressed('seg-depthdur', 'data-ddur', state.depthDur);
-    setPressed('seg-depthmax', 'data-dmax', state.depthMax);
-    setPressed('seg-depthmode', 'data-dmode', state.depthMode);
-    setPressed('seg-base', 'data-base', state.showBase ? 'on' : 'off');
     setPressed('seg-range3', 'data-range', state.range);
     setPressed('seg-profile', 'data-profile', state.profile);
     setPressed('seg-dview', 'data-dview', state.dview);
@@ -1311,11 +860,8 @@
     setPressed('seg-dn2', 'data-dn', state.dn);
 
     if (state.tab === 'overview') renderOverview();
-    if (state.tab === 'capture') renderCapture();
     if (state.tab === 'duck') renderDuck();
     if (state.tab === 'solar') renderSolar();
-    if (state.tab === 'depth') renderDepth();
-    if (state.tab === 'recent') renderRecent();
   }
 
   function bind() {
@@ -1323,11 +869,7 @@
       var b = e.target.closest('button'); if (!b) return;
       state.tab = b.dataset.tab; renderAll();
     });
-    $('seg-view').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.view = b.dataset.view; renderAll();
-    });
-    ['seg-range', 'seg-range3'].forEach(function (id) {
+    ['seg-range3'].forEach(function (id) {
       $(id).addEventListener('click', function (e) {
         var b = e.target.closest('button'); if (!b) return;
         state.range = parseInt(b.dataset.range, 10); renderAll();
@@ -1359,38 +901,11 @@
       var b = e.target.closest('button'); if (!b) return;
       state.dview = b.dataset.dview; renderAll();
     });
-    $('seg-depthdur').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.depthDur = b.dataset.ddur; renderAll();
-    });
-    $('seg-depthmax').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.depthMax = parseFloat(b.dataset.dmax); renderAll();
-    });
-    $('seg-depthmode').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.depthMode = b.dataset.dmode; renderAll();
-    });
-    $('seg-depthpre').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.depthS = parseFloat(b.dataset.dpre); state.depthMode = 'manual'; renderAll();
-    });
-    $('rng-depth').addEventListener('input', function (e) {
-      state.depthS = parseFloat(e.target.value) || 15; state.depthMode = 'manual'; renderAll();
-    });
     $('sel-solzone').addEventListener('change', function (e) { state.solZone = e.target.value; renderAll(); });
     $('sel-solmonth').addEventListener('change', function (e) { state.solMonth = e.target.value; renderAll(); });
     $('seg-solscn').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       state.solScn = b.dataset.scn; renderAll();
-    });
-    $('seg-tech').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.tech = b.dataset.tech; renderAll();
-    });
-    $('seg-base').addEventListener('click', function (e) {
-      var b = e.target.closest('button'); if (!b) return;
-      state.showBase = b.dataset.base === 'on'; renderAll();
     });
   }
 
@@ -1402,14 +917,11 @@
 
   Promise.all([
     fetch('data/summary.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('summary'); return r.json(); }),
-    fetch('data/recent.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('recent'); return r.json(); }),
-    fetch('data/solar_bess.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-    fetch('data/depth.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-    fetch('data/slope.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    fetch('data/solar_bess.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
   ]).then(function (res) {
-    DATA = res[0]; RECENT = res[1]; SOLAR = res[2]; DEPTH = res[3]; SLOPE = res[4];
+    DATA = res[0]; SOLAR = res[1];
     var ZN = { SE1: 'SE1 Luleå', SE2: 'SE2 Sundsvall', SE3: 'SE3 Stockholm', SE4: 'SE4 Malmö', DE: 'Germany (DE-LU)', DK1: 'Denmark West (DK1)', DK2: 'Denmark East (DK2)', FI: 'Finland' };
-    [DATA, SOLAR, DEPTH, SLOPE].forEach(function (obj) {
+    [DATA, SOLAR].forEach(function (obj) {
       if (obj && obj.zones) Object.keys(obj.zones).forEach(function (k) { if (ZN[k]) obj.zones[k].name = ZN[k]; });
     });
     var seen = {};
