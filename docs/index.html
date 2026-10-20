@@ -147,6 +147,10 @@
   .kpi-rows td.z { font-weight: 600; width: 46px; }
   .kpi-rows td.v { text-align: right; font: 700 15px var(--font-head); padding-right: 10px; white-space: nowrap; }
   .kpi-rows td.d { text-align: right; white-space: nowrap; width: 104px; color: var(--muted); font-size: 13px; }
+  .period-line { margin: 2px 0 6px; }
+  .period-badge { display: inline-block; font: 600 12px var(--font-body); color: #fff; background: var(--ink); border-radius: 999px; padding: 3px 10px; }
+  .period-badge.roll { background: var(--wind); }
+  .kpi-cmp { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
   .arrow { font-size: 12px; margin-right: 4px; }
   .arrow.up { color: var(--wind); }
   .arrow.down { color: #b87500; }
@@ -219,22 +223,31 @@
 
   <!-- Overview -->
   <section class="panel" id="panel-overview">
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Period for price and volatility" id="seg-ovview">
+        <button data-ov="month" aria-pressed="true">Latest month</button>
+        <button data-ov="roll" aria-pressed="false">Rolling 12 months</button>
+      </div>
+    </div>
     <p class="ov-lead"><span id="ov-lead"></span><sup><a href="#n6">6</a></sup></p>
     <div class="kpi-grid" id="ov-kpis"></div>
     <div class="ov-charts">
       <div class="chart-block">
         <h2>Electricity price</h2>
-        <p class="sub">Average day-ahead price, rolling 12 months, EUR/MWh.</p>
+        <p class="period-line"><span class="period-badge" id="ov-badge-price"></span></p>
+        <p class="sub" id="ov-sub-price"></p>
         <div class="chart" id="ov-chart-price"></div>
       </div>
       <div class="chart-block">
         <h2>Price volatility</h2>
-        <p class="sub">Average daily spread between the highest and lowest hourly price, rolling 12 months, EUR/MWh.<sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
+        <p class="period-line"><span class="period-badge" id="ov-badge-vol"></span></p>
+        <p class="sub"><span id="ov-sub-vol"></span><sup><a href="#n2">2</a>, <a href="#n3">3</a></sup></p>
         <div class="chart" id="ov-chart-vol"></div>
       </div>
       <div class="chart-block">
         <h2>Solar capture rate</h2>
-        <p class="sub">Price earned by solar as a percentage of the average price, rolling 12 months.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
+        <p class="period-line"><span class="period-badge roll" id="ov-badge-solar"></span></p>
+        <p class="sub">Price earned by solar as a percentage of the average price. Always shown as a rolling 12-month figure.<sup><a href="#n1">1</a>, <a href="#n4">4</a></sup></p>
         <div class="chart" id="ov-chart-solar"></div>
         <p class="note" id="ov-note-solar"></p>
       </div>
@@ -363,8 +376,11 @@
       <dt>Price volatility</dt>
       <dd>Here measured as the average daily spread, the day's highest minus lowest hourly price, over the latest twelve months. Larger swings within the day mean more room for flexibility such as batteries and demand response.</dd>
 
+      <dt>Latest month</dt>
+      <dd>The most recent complete calendar month. The current month is never shown, because it is not yet complete. In the Overview, the latest month is compared with the same month a year earlier, which avoids mixing in the normal seasonal pattern.</dd>
+
       <dt>Arrows (Overview)</dt>
-      <dd>Compare the latest 12 months with the 12 months before. An arrow pointing up or down means a change of more than 1 % (for solar capture rate, more than 1 percentage point). Smaller changes are shown as flat. The arrows show direction only, not whether a change is good or bad.</dd>
+      <dd>Compare the latest 12 months with the 12 months before, or, in the latest-month view, the latest complete month with the same month a year earlier. Solar capture rate is always compared on 12 months. An arrow pointing up or down means a change of more than 1 % (for solar capture rate, more than 1 percentage point). Smaller changes are shown as flat. The arrows show direction only, not whether a change is good or bad.</dd>
 
       <dt>Capture price</dt>
       <dd>The average price a technology has received when it produced, that is, the price weighted by production hour by hour.</dd>
@@ -416,7 +432,7 @@
   'use strict';
 
   var MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var state = { zone: 'SE3', tab: 'overview', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', solSrc: 'reported' };
+  var state = { zone: 'SE3', tab: 'overview', ovView: 'month', range: 12, profile: 'all', dview: 'rolling', dn: 'rolling', selZones: ['SE1', 'SE2', 'SE3', 'SE4'], solZone: 'SE4', solMonth: null, solScn: '2h', solSrc: 'reported' };
   var DATA = null;
 
   var qs = new URLSearchParams(location.search);
@@ -760,30 +776,47 @@
 
   /* ---------- Tab: Overview ---------- */
   var SWE = ['SE1', 'SE2', 'SE3', 'SE4'];
-  function ovSeries(k, kind) {
+  function longLabel(m) { return MON[parseInt(m.slice(5, 7), 10) - 1] + ' ' + m.slice(0, 4); }
+  /* mode: 'month' = månadsvärden, 'roll' = rullande 12 månader (sol är alltid rullande) */
+  function ovSeries(k, kind, mode) {
     var zz = DATA.zones[k];
-    if (kind === 'price') return zoneVals(zz, zz.r_base, ALLM);
-    if (kind === 'vol') return rollW(zoneVals(zz, zz.spread.spread_mean, ALLM), zoneVals(zz, zz.spread_days || zz.months.map(dim), ALLM), 12);
+    if (kind === 'price') return zoneVals(zz, mode === 'roll' ? zz.r_base : zz.base, ALLM);
+    if (kind === 'vol') {
+      var v = zoneVals(zz, zz.spread.spread_mean, ALLM);
+      return mode === 'roll' ? rollW(v, zoneVals(zz, zz.spread_days || zz.months.map(dim), ALLM), 12) : v;
+    }
     if (kind === 'solar') return zoneVals(zz, zz.solar.r_rate, ALLM).map(function (v) { return v == null ? null : v * 100; });
     return [];
   }
   var OV = [
-    { id: 'price', title: 'Electricity price', def: 'Average day-ahead price, last 12 months', chart: 'ov-chart-price', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true },
-    { id: 'vol', title: 'Price volatility', def: 'Average daily spread (highest minus lowest hourly price)', chart: 'ov-chart-vol', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true },
-    { id: 'solar', title: 'Solar capture rate', def: 'Price earned by solar as a share of the average price', chart: 'ov-chart-solar', axis: ' %', fmtv: function (v) { return fmt(v) + ' %'; }, rel: false }
+    { id: 'price', title: 'Electricity price', def: 'Average day-ahead price', chart: 'ov-chart-price', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true, rollOnly: false,
+      sub: { month: 'Average day-ahead price per month, EUR/MWh. The last 24 months.', roll: 'Average day-ahead price, rolling 12 months, EUR/MWh.' } },
+    { id: 'vol', title: 'Price volatility', def: 'Average daily spread (highest minus lowest hourly price)', chart: 'ov-chart-vol', axis: ' €', fmtv: function (v) { return fmt(v) + ' €/MWh'; }, rel: true, rollOnly: false,
+      sub: { month: 'Average daily spread between the highest and lowest hourly price, per month, EUR/MWh. The last 24 months.', roll: 'Average daily spread between the highest and lowest hourly price, rolling 12 months, EUR/MWh.' } },
+    { id: 'solar', title: 'Solar capture rate', def: 'Price earned by solar as a share of the average price', chart: 'ov-chart-solar', axis: ' %', fmtv: function (v) { return fmt(v) + ' %'; }, rel: false, rollOnly: true }
   ];
 
   function renderOverview() {
     var zones = SWE.filter(function (k) { return DATA.zones[k]; });
+    var view = state.ovView;
+    var last = ALLM[ALLM.length - 1], sameLast = ALLM.length >= 13 ? ALLM[ALLM.length - 13] : null;
     var last12 = ALLM.slice(-12), prev12 = ALLM.length >= 24 ? ALLM.slice(-24, -12) : [];
     var span = function (m) { return m.length ? label(m[0]) + '–' + label(m[m.length - 1]) : ''; };
-    $('ov-lead').textContent = 'The latest 12 months (' + span(last12) + ')' + (prev12.length ? ' compared with the 12 months before (' + span(prev12) + ')' : '') + ', for the four Swedish bidding zones.';
+    var badge = function (mode) { return mode === 'month' ? 'Latest complete month · ' + longLabel(last) : 'Rolling 12 months · ' + span(last12); };
+    var cmpText = function (mode) {
+      return mode === 'month' ? (sameLast ? 'Change vs ' + longLabel(sameLast) + ', the same month a year earlier' : '')
+                              : (prev12.length ? 'Change vs the 12 months before (' + span(prev12) + ')' : '');
+    };
+    $('ov-lead').textContent = view === 'month'
+      ? 'Latest complete month (' + longLabel(last) + ')' + (sameLast ? ' compared with the same month a year earlier (' + longLabel(sameLast) + ')' : '') + ', for the four Swedish bidding zones. The current month is not included. Solar capture rate is always a rolling 12-month figure (' + span(last12) + ').'
+      : 'The latest 12 months (' + span(last12) + ')' + (prev12.length ? ' compared with the 12 months before (' + span(prev12) + ')' : '') + ', for the four Swedish bidding zones.';
 
     var cards = '', anySolar = false;
     OV.forEach(function (m) {
+      var mode = m.rollOnly ? 'roll' : (view === 'month' ? 'month' : 'roll');
       var ups = 0, downs = 0, flats = 0, avail = 0, rows = '';
       zones.forEach(function (k) {
-        var ser = ovSeries(k, m.id), cur = ser[ser.length - 1], prev = ser[ser.length - 13];
+        var ser = ovSeries(k, m.id, mode), cur = ser[ser.length - 1], prev = ser[ser.length - 13];
         var chg = null, cls = 'flat', arrow = '▶', txt = 'n/a';
         if (cur != null && prev != null && prev !== 0) {
           chg = m.rel ? (cur / prev - 1) * 100 : cur - prev;
@@ -801,30 +834,39 @@
       if (downs) parts.push('falling in ' + downs);
       if (flats) parts.push('flat in ' + flats);
       var summary = avail ? parts.join(', ') + ' of ' + avail + ' zones' : 'data not available yet';
-      cards += '<div class="kpi-card"><h3>' + m.title + '</h3><p class="kpi-def">' + m.def + '</p><p class="kpi-summary">' + summary.charAt(0).toUpperCase() + summary.slice(1) + '</p><table class="kpi-rows"><tbody>' + rows + '</tbody></table></div>';
+      cards += '<div class="kpi-card"><h3>' + m.title + '</h3><p class="period-line"><span class="period-badge ' + mode + '">' + badge(mode) + '</span></p><p class="kpi-def">' + m.def + '</p><p class="kpi-summary">' +
+               summary.charAt(0).toUpperCase() + summary.slice(1) + '</p><table class="kpi-rows"><tbody>' + rows + '</tbody></table><p class="kpi-cmp">' + cmpText(mode) + '</p></div>';
     });
     $('ov-kpis').innerHTML = cards;
 
     OV.forEach(function (m) {
+      var mode = m.rollOnly ? 'roll' : (view === 'month' ? 'month' : 'roll');
       var series = {}, first = ALLM.length;
       zones.forEach(function (k) {
-        series[k] = ovSeries(k, m.id);
+        series[k] = ovSeries(k, m.id, mode);
         for (var i = 0; i < series[k].length; i++) if (series[k][i] != null) { if (i < first) first = i; break; }
       });
+      if (mode === 'month') first = Math.max(first, ALLM.length - 24);
+      var bid = { price: 'ov-badge-price', vol: 'ov-badge-vol', solar: 'ov-badge-solar' }[m.id];
+      $(bid).textContent = badge(mode);
+      $(bid).className = 'period-badge ' + mode;
+      if (m.sub) $('ov-sub-' + m.id).textContent = m.sub[mode];
       var xs = ALLM.slice(first).map(label), lists = [];
       var traces = zones.map(function (k) {
         var y = series[k].slice(first); lists.push(y);
-        return { type: 'scatter', mode: 'lines', name: k, x: xs, y: y, connectgaps: false, line: { color: ZONE_COLORS[k] || '#888', width: 2.8 },
+        return { type: 'scatter', mode: mode === 'month' ? 'lines+markers' : 'lines', name: k, x: xs, y: y, connectgaps: false, line: { color: ZONE_COLORS[k] || '#888', width: 2.8 }, marker: { size: 4 },
                  hovertemplate: m.id === 'solar' ? '%{y:.0f} %' : '%{y:.0f} €/MWh' };
       });
       if (first >= ALLM.length) { Plotly.react(m.chart, [], layout([], {}), CONFIG); return; }
       Plotly.react(m.chart, traces, layout(xs, { yaxis: yAxis({ ticksuffix: m.axis }, niceRange(extentOf(lists), true, m.id === 'solar' ? 100 : null)) }), CONFIG);
     });
-    var noSolar = zones.filter(function (k) { var sr = ovSeries(k, 'solar'); return sr[sr.length - 1] == null; });
+    var noSolar = zones.filter(function (k) { var sr = ovSeries(k, 'solar', 'roll'); return sr[sr.length - 1] == null; });
     $('ov-note-solar').textContent = anySolar
       ? 'Solar production in Sweden is incompletely reported to ENTSO-E, so this indicator is indicative.' + (noSolar.length ? ' No usable data for ' + noSolar.join(', ') + '.' : '')
       : 'No usable solar production data is reported to ENTSO-E for these zones.';
-    $('ov-note').textContent = 'Arrows compare the latest 12 months with the 12 months before and show direction only, not whether a change is good or bad. See the definitions below.';
+    $('ov-note').textContent = view === 'month'
+      ? 'Arrows compare the latest complete month with the same month a year earlier, and show direction only, not whether a change is good or bad. A single month can be unusual, for example because of the weather, so the rolling 12-month view is better for trends. See the definitions below.'
+      : 'Arrows compare the latest 12 months with the 12 months before and show direction only, not whether a change is good or bad. See the definitions below.';
   }
 
   /* ---------- Samordning ---------- */
@@ -845,6 +887,7 @@
     ['overview', 'duck', 'solar'].forEach(function (t) { $('panel-' + t).hidden = (t !== state.tab); });
 
     setPressed('seg-solscn', 'data-scn', state.solScn);
+    setPressed('seg-ovview', 'data-ov', state.ovView);
     setPressed('seg-solsrc', 'data-src', state.solSrc);
     setPressed('seg-profile', 'data-profile', state.profile);
     setPressed('seg-dview', 'data-dview', state.dview);
@@ -889,6 +932,10 @@
     });
     $('sel-solzone').addEventListener('change', function (e) { state.solZone = e.target.value; renderAll(); });
     $('sel-solmonth').addEventListener('change', function (e) { state.solMonth = e.target.value; renderAll(); });
+    $('seg-ovview').addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      state.ovView = b.dataset.ov; renderAll();
+    });
     $('seg-solsrc').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
       state.solSrc = b.dataset.src; renderAll();
