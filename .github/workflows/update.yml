@@ -9,6 +9,7 @@ on:
     paths:
       - "docs/index.html"
       - "update_data.py"
+      - "make_chart_images.py"
       - ".github/workflows/update.yml"
 
 permissions:
@@ -49,6 +50,9 @@ jobs:
             git pull --rebase origin main      # någon kan ha sparat något under tiden (till exempel du i webbläsaren)
             git push
           fi
+
+      - name: Skapa diagrambilder till bouncyenergy.com
+        run: python make_chart_images.py    # skriver docs/img/*.png|svg, som publiceras men inte sparas i repot
 
       - uses: actions/configure-pages@v5
 

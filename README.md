@@ -58,6 +58,17 @@ Länka sedan till subdomänen från menyn.
 
 Direktlänkar: `?zone=SE4&tab=spread` (flikar: `capture`, `spread`, `recent`).
 
+## 5. Diagrambild som uppdateras automatiskt
+
+Varje nattlig körning skapar också en bild av diagrammet *Capture rate, last 12 months* (fliken Solar park + BESS):
+
+```
+https://bouncyenergy.github.io/bouncy-data/img/capture-rate.png    (2040 × 700, för webben)
+https://bouncyenergy.github.io/bouncy-data/img/capture-rate.svg
+```
+
+Bilden skapas av `make_chart_images.py` från `docs/data/solar_bess.json`, visar samma siffror som dashboarden och har datum, källa och texten "Illustrative model, not a forecast" i fotraden. Den publiceras med sidan men sparas inte i repot (`docs/img/` är ignorerad). Använd den som bild på bouncyenergy.com, länkad till dashboarden, så slipper du uppdatera siffror för hand. Prova lokalt med `python update_data.py --demo && python make_chart_images.py`.
+
 ## Anpassa
 
 * Färger och typsnitt: variablerna överst i `docs/index.html`.
