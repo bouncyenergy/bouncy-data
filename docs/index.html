@@ -194,11 +194,27 @@
     .chart { height: 300px; }
     .kpi dd { font-size: 24px; }
   }
+  /* Länk tillbaka till bouncyenergy.com och kontaktruta */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 22px; font-size: 14px; }
+  .topbar a { color: var(--ink); text-decoration: none; font-weight: 500; }
+  .topbar a.back:hover { text-decoration: underline; }
+  .btn { display: inline-block; padding: 9px 16px; border-radius: 4px; background: #1f4d49; color: #fff !important; font: 600 14px/1.2 var(--font-head); text-decoration: none; }
+  .btn:hover { background: #173b38; }
+  .btn.ghost { background: transparent; color: var(--ink) !important; border: 1px solid var(--ink); }
+  .btn.ghost:hover { background: rgba(19, 36, 45, .06); }
+  .cta { margin-top: 30px; padding: 22px 24px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 16px 24px; flex-wrap: wrap; }
+  .cta h2 { font: 700 20px/1.2 var(--font-head); margin: 0 0 4px; }
+  .cta p { margin: 0; color: var(--muted); }
+  .cta .actions { display: flex; gap: 10px; flex-wrap: wrap; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <nav class="topbar" aria-label="Bouncy Energy">
+    <a class="back" href="https://bouncyenergy.com">&larr; Back to bouncyenergy.com</a>
+    <a class="btn" href="mailto:olle@bouncyenergy.com?subject=Market%20insights">Discuss an opportunity</a>
+  </nav>
   <h1>Swedish electricity market</h1>
   <p class="lede">Prices, volatility and solar capture rates for the four Swedish bidding zones, with Finland, Denmark and Germany as comparison. Updated every night from ENTSO-E.</p>
 
@@ -422,6 +438,17 @@
     </ol>
 
     <p class="disclaimer">The information is intended as background only and does not constitute investment advice or any other advice. Data may contain errors or gaps. Currency: euro.</p>
+  </section>
+
+  <section class="cta" aria-label="Contact">
+    <div>
+      <h2>Need a market analysis or business case for your project?</h2>
+      <p>Bouncy helps energy companies, industry and investors turn market insight into projects that reach an investment decision.</p>
+    </div>
+    <div class="actions">
+      <a class="btn" href="mailto:olle@bouncyenergy.com?subject=Market%20insights">Get in touch</a>
+      <a class="btn ghost" href="https://bouncyenergy.com">Back to bouncyenergy.com</a>
+    </div>
   </section>
 
   <footer>Source: <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a>. Last updated: <span id="updated">–</span>. Bouncy Energy.</footer>
